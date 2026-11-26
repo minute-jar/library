@@ -1,0 +1,53 @@
+{
+  "root_public_key": "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+  "checked_at": "2026-11-27T00:00:00Z",
+  "served": [
+    {
+      "file": "served/keys.json",
+      "path": "/.well-known/minute-jar-library.json"
+    },
+    {
+      "file": "served/index.json",
+      "path": "/v1/index"
+    },
+    {
+      "file": "served/items/0123456789abcdef0123456789abcdef/1.json",
+      "path": "/v1/items/0123456789abcdef0123456789abcdef/versions/1"
+    },
+    {
+      "file": "served/items/0123456789abcdef0123456789abcdef/2.json",
+      "path": "/v1/items/0123456789abcdef0123456789abcdef/versions/2"
+    },
+    {
+      "file": "served/items/fedcba9876543210fedcba9876543210/1.json",
+      "path": "/v1/items/fedcba9876543210fedcba9876543210/versions/1"
+    }
+  ],
+  "refused": [
+    {
+      "file": "refused/forged-index.json",
+      "asked_as": "index",
+      "refusal": "Forged"
+    },
+    {
+      "file": "refused/expired-index.json",
+      "asked_as": "index",
+      "refusal": "Expired"
+    },
+    {
+      "file": "refused/uncertified-index.json",
+      "asked_as": "index",
+      "refusal": "UnknownKey"
+    },
+    {
+      "file": "refused/index-asked-as-item.json",
+      "asked_as": "item",
+      "refusal": "WrongKind"
+    },
+    {
+      "file": "refused/contract-2-item.json",
+      "asked_as": "item",
+      "refusal": "UnknownContract"
+    }
+  ]
+}

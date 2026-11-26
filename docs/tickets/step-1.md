@@ -1,6 +1,6 @@
 # Step 1 of the library service: tickets
 
-Step 1 of `docs/specs/library-service.md`, broken into vertical slices: each one goes from storage to what a caller sees and is tested through the service's HTTP interface (spec, Testing Decisions). **AFK** tickets can be built by an agent alone; **HITL** tickets need the maintainer (an account to open, content to read, a legal or provider answer). Every ticket is mirrored as a GitHub issue of `minute-jar/library`, under the parent issue "Step 1 of the library service", with the same blockers.
+Step 1 of `docs/specs/library-service.md`, broken into vertical slices: each one goes from storage to what a caller sees and is tested through the service's HTTP interface (spec, Testing Decisions). **AFK** tickets can be built by an agent alone; **HITL** tickets need the maintainer (an account to open, content to read, a legal or provider answer). Every ticket is mirrored as a GitHub issue of `minute-jar/library`, under the parent issue "Step 1 of the library service", with the same blockers: ticket N is issue #N+1 (ticket 1 is #2), the parent is #1.
 
 User stories are those of the library spec (S1 to S29).
 

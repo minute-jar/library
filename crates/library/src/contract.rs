@@ -65,9 +65,13 @@ impl PublicKey {
     }
 
     fn verify(self, payload: &str, signature: &[u8; 64]) -> Result<(), Refusal> {
-        let key = ed25519_dalek::VerifyingKey::from_bytes(&self.0).map_err(|_| Refusal::UnknownKey)?;
-        key.verify_strict(payload.as_bytes(), &ed25519_dalek::Signature::from_bytes(signature))
-            .map_err(|_| Refusal::Forged)
+        let key =
+            ed25519_dalek::VerifyingKey::from_bytes(&self.0).map_err(|_| Refusal::UnknownKey)?;
+        key.verify_strict(
+            payload.as_bytes(),
+            &ed25519_dalek::Signature::from_bytes(signature),
+        )
+        .map_err(|_| Refusal::Forged)
     }
 }
 
@@ -91,8 +95,12 @@ fn sign_with(
     let payload = Value::Object(payload).to_string();
     let signature = key.sign(payload.as_bytes()).to_bytes();
     let public = PublicKey(key.verifying_key().to_bytes());
-    serde_json::to_string(&Envelope { payload, signature: hex::encode(signature), key: public.id() })
-        .expect("an envelope of strings serialises")
+    serde_json::to_string(&Envelope {
+        payload,
+        signature: hex::encode(signature),
+        key: public.id(),
+    })
+    .expect("an envelope of strings serialises")
 }
 
 /// An instant as the contract writes it: RFC 3339, UTC, to the second.
@@ -120,12 +128,23 @@ impl RootKey {
     }
 
     /// The keys document certifying each signing key until its date.
-    pub fn certify(&self, signing_keys: &[(PublicKey, Timestamp)], issued_at: Timestamp, expires_at: Timestamp) -> String {
+    pub fn certify(
+        &self,
+        signing_keys: &[(PublicKey, Timestamp)],
+        issued_at: Timestamp,
+        expires_at: Timestamp,
+    ) -> String {
         let listed: Vec<Value> = signing_keys
             .iter()
             .map(|(key, not_after)| json!({"id": key.id(), "public_key": key.to_hex(), "not_after": time(*not_after)}))
             .collect();
-        sign_with(&self.0, Kind::Keys, issued_at, Some(expires_at), json!({"signing_keys": listed}))
+        sign_with(
+            &self.0,
+            Kind::Keys,
+            issued_at,
+            Some(expires_at),
+            json!({"signing_keys": listed}),
+        )
     }
 }
 
@@ -142,7 +161,13 @@ impl SigningKey {
     }
 
     /// A signed document of this kind: the contract's header, then `body`'s fields.
-    pub fn sign(&self, kind: Kind, issued_at: Timestamp, expires_at: Option<Timestamp>, body: Value) -> String {
+    pub fn sign(
+        &self,
+        kind: Kind,
+        issued_at: Timestamp,
+        expires_at: Option<Timestamp>,
+        body: Value,
+    ) -> String {
         sign_with(&self.0, kind, issued_at, expires_at, body)
     }
 }
@@ -155,11 +180,19 @@ pub struct Keys {
 
 /// Checks a keys document against the root key's public half.
 pub fn verify_keys(document: &[u8], root: &PublicKey, now: Timestamp) -> Result<Keys, Refusal> {
-    let payload = open(document, Kind::Keys, now, |id| (id == root.id()).then_some(*root))?;
-    let listed = payload.get("signing_keys").and_then(Value::as_array).ok_or(Refusal::Malformed)?;
+    let payload = open(document, Kind::Keys, now, |id| {
+        (id == root.id()).then_some(*root)
+    })?;
+    let listed = payload
+        .get("signing_keys")
+        .and_then(Value::as_array)
+        .ok_or(Refusal::Malformed)?;
     let mut signing_keys = Vec::new();
     for entry in listed {
-        let public_key = entry.get("public_key").and_then(Value::as_str).ok_or(Refusal::Malformed)?;
+        let public_key = entry
+            .get("public_key")
+            .and_then(Value::as_str)
+            .ok_or(Refusal::Malformed)?;
         let bytes: [u8; 32] = hex::decode(public_key)
             .ok()
             .and_then(|b| b.try_into().ok())
@@ -207,7 +240,10 @@ fn open(
         return Err(Refusal::WrongKind);
     }
     if let Some(expires_at) = payload.get("expires_at") {
-        let expires_at: Timestamp = expires_at.as_str().and_then(|t| t.parse().ok()).ok_or(Refusal::Malformed)?;
+        let expires_at: Timestamp = expires_at
+            .as_str()
+            .and_then(|t| t.parse().ok())
+            .ok_or(Refusal::Malformed)?;
         if now > expires_at {
             return Err(Refusal::Expired);
         }

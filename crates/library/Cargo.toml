@@ -17,10 +17,10 @@ jiff = { version = "1.0.3", features = ["serde"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
 sha2 = "0.11.0"
-sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros"] }
-tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net"] }
+sqlx = { version = "0.8.6", default-features = false, features = ["runtime-tokio", "postgres", "migrate", "macros", "json"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "time"] }
 
 [dev-dependencies]
 http-body-util = "0.1.5"
-testcontainers-modules = { version = "0.13.0", features = ["postgres"] }
+testcontainers-modules = { version = "0.13.0", features = ["blocking", "postgres"] }
 tower = { version = "0.5.3", features = ["util"] }
