@@ -16,6 +16,17 @@ What does not live here:
 
 Start with [GLOSSARY.md](GLOSSARY.md), the [decision records](docs/adr/) and the [service spec](docs/specs/library-service.md).
 
+## Development
+
+The service is in Rust (`crates/library`, ADR-0003). Its tests start a throwaway PostgreSQL with Docker, or use the database named by `DATABASE_URL`:
+
+```
+cargo test
+cargo clippy --all-targets
+```
+
+The interface with family servers is `docs/specs/interface-v1.md`, with its fixtures in `fixtures/v1/`. Work is tracked in [GitHub issues](https://github.com/minute-jar/library/issues), broken down in `docs/tickets/step-1.md`.
+
 ## Licence
 
 Code: [MPL-2.0](LICENSE), contributions signed off under the [DCO](CONTRIBUTING.md). Shared content: CC BY-SA 4.0 (ADR-0001).
