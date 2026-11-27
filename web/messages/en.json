@@ -22,6 +22,7 @@
 	"editorial": "Made by Minute Jar",
 	"selection": "Selection",
 	"derived_from": "Derived from a work by {pseudonym}",
+	"item_original": "See the original: {title}, version {version}",
 	"licence": "Licence CC BY-SA 4.0",
 	"page_previous": "Previous",
 	"page_next": "Next",

@@ -135,7 +135,12 @@
 							</div>
 							{#if entry.derived_from}
 								<p class="text-sm text-muted-foreground" lang={getLocale()}>
-									{m.derived_from({ pseudonym: entry.derived_from.pseudonym })}
+									<a
+										href={resolve(localizeHref(`/items/${entry.derived_from.item}`) as Path)}
+										class="underline-offset-4 hover:underline"
+									>
+										{m.derived_from({ pseudonym: entry.derived_from.pseudonym })}
+									</a>
 								</p>
 							{/if}
 							<p class="text-xs text-muted-foreground" lang={getLocale()}>{m.licence()}</p>

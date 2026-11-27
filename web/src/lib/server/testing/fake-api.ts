@@ -68,6 +68,20 @@ export const verbsPage: ItemPage = {
 	]
 };
 
+/** The item page of a derived work of version 1 of the irregular verbs, by another author. */
+export const moreVerbs: ItemPage = {
+	...verbs,
+	item: '00112233445566778899aabbccddeeff',
+	version: 1,
+	title: 'More irregular verbs',
+	author: { pseudonym: 'Lark', editorial: false },
+	derived_from: { item: verbs.item, version: 1, pseudonym: 'Owl' },
+	published_at: '2026-11-24T08:00:00Z',
+	content: { questions: [{ type: 'typed', prompt: "Past of 'run'", answers: ['ran'] }] },
+	media: [],
+	versions: [{ version: 1, published_at: '2026-11-24T08:00:00Z' }]
+};
+
 export const verbsRatings: Ratings = {
 	item: verbs.item,
 	ratings: [0, 0, 1, 0, 2],
@@ -102,8 +116,11 @@ export function fakeApi(): FakeApi {
 		asked: [],
 		page: { items: [verbs, fractions], total: 2, page: 1, pages: 1 },
 		filters: offered,
-		items: { [verbs.item]: verbsPage },
-		ratings: { [verbs.item]: verbsRatings },
+		items: { [verbs.item]: verbsPage, [moreVerbs.item]: moreVerbs },
+		ratings: {
+			[verbs.item]: verbsRatings,
+			[moreVerbs.item]: { item: moreVerbs.item, ratings: [0, 0, 0, 0, 0], reviews: [] }
+		},
 		files: { [`${verbs.item}/2`]: verbsFile, [`${verbs.item}/1`]: verbsFile },
 		failure: null,
 		fetch: (input) => {

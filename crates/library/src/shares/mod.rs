@@ -15,6 +15,7 @@
 
 pub(crate) mod held;
 pub(crate) mod http;
+pub(crate) mod versions;
 
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
@@ -23,7 +24,8 @@ use sqlx::PgPool;
 
 use crate::accounts::Session;
 use crate::review::{RefusalReason, ReviewOutcome, Reviewer, Submission};
-use crate::{Author, Curriculum, ItemType, Library, Metadata, NewVersion, PublishError};
+use crate::{Author, Curriculum, ItemType, Library, Metadata, NewVersion, Origin, PublishError};
+use versions::NamedOrigin;
 
 /// The version of the sharing terms an author accepts: changed whenever
 /// their text changes, so that every author accepts the new text at their
@@ -56,6 +58,18 @@ pub(crate) enum ShareRefusal {
     MediumTooLarge,
     MediaTooLarge,
     UnsupportedMedium,
+    /// The item a new version is for is not published.
+    UnknownItem,
+    /// The item a new version is for is another account's.
+    NotTheAuthor,
+    /// The item a new version is for is withdrawn.
+    WithdrawnItem,
+    /// The original a derived work names is not shown by the catalogue.
+    UnknownOrigin,
+    /// A derived work names itself as its original.
+    BadOrigin,
+    /// A new version names another original than the versions before it.
+    OriginChanged,
     /// The account has shared [`SHARES_PER_DAY`] items today; it may share
     /// again from `next_share_at`.
     QuotaReached {
@@ -87,6 +101,12 @@ impl From<PublishError> for ShareRefusal {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Prepared {
+    /// The account's own item this is a new version of; none for a first share.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item: Option<String>,
+    /// The original this is derived from, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub derived_from: Option<NamedOrigin>,
     #[serde(rename = "type")]
     pub kind: Kind,
     pub title: String,
@@ -142,8 +162,14 @@ pub const TITLE_LENGTH: usize = 120;
 pub const DESCRIPTION_LENGTH: usize = 2000;
 
 impl Prepared {
-    /// The version to publish as `item` under `pseudonym`, once checked.
-    fn version(&self, item: &str, pseudonym: &str) -> Result<NewVersion, ShareRefusal> {
+    /// The version to publish as `item` under `pseudonym`, derived from
+    /// `derived_from`, once checked.
+    fn version(
+        &self,
+        item: &str,
+        pseudonym: &str,
+        derived_from: Option<Origin>,
+    ) -> Result<NewVersion, ShareRefusal> {
         let filled = |text: &str, longest: usize| {
             let length = text.trim().chars().count();
             (1..=longest).contains(&length) && !text.chars().any(char::is_control)
@@ -189,7 +215,7 @@ impl Prepared {
                 pseudonym: pseudonym.to_string(),
                 editorial: false,
             },
-            derived_from: None,
+            derived_from,
             metadata: Metadata {
                 language: metadata.language.trim().to_string(),
                 subject: metadata.subject.trim().to_string(),
@@ -341,8 +367,17 @@ pub(crate) async fn share(
     if !accepts && accepted_terms(pool, sharer.id).await?.as_deref() != Some(SHARING_TERMS) {
         return Err(ShareRefusal::SharingTermsRequired);
     }
-    let item = random_id();
-    let version = prepared.version(&item, &sharer.pseudonym)?;
+    let mut version = prepared.version("", &sharer.pseudonym, None)?;
+    let lineage = versions::lineage(
+        pool,
+        sharer.id,
+        prepared.item.as_deref(),
+        prepared.derived_from.as_ref(),
+    )
+    .await?;
+    let item = lineage.item;
+    version.item = item.clone();
+    version.derived_from = lineage.derived_from;
     if accepts {
         accept_terms(pool, sharer.id, now).await?;
     }
@@ -351,7 +386,7 @@ pub(crate) async fn share(
         .reviewer
         .review(Submission {
             item: &item,
-            version: 1,
+            version: lineage.version,
             title: &version.title,
             language: &version.metadata.language,
             content: &version.content,
