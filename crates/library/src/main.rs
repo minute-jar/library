@@ -8,6 +8,9 @@
 //!   until the S3-compatible store is wired at deployment;
 //! - `LIBRARY_LISTEN`: the address to listen on, `127.0.0.1:8080` by default.
 //!
+//! Reports answer `503` until a review adapter (ticket 13) and a notifier
+//! are wired here with `Library::with_reports`.
+//!
 //! Sign-in with a Minute Jar account stays off (its routes answer
 //! `unavailable`) until the identity service's adapter is wired, with the
 //! identity service of `minute-jar/hosting` (ADR-0006).

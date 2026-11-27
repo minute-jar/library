@@ -40,7 +40,7 @@ The JSON API through which the website browses and searches the public library (
 }
 ```
 
-Each entry has the fields of an index entry (`interface-v1.md`, Index), its signals counted when asked; a withdrawn item is left out, and a withdrawn version gives way to the latest one before it, as in the index. Every parameter is optional; together they narrow the catalogue to the items that match all of them. Values are compared without regard to case.
+Each entry has the fields of an index entry (`interface-v1.md`, Index), its signals counted when asked; a withdrawn item or one hidden from new imports (`interface-v1.md`, Reports) is left out, and a withdrawn version gives way to the latest one before it, as in the index. Every parameter is optional; together they narrow the catalogue to the items that match all of them. Values are compared without regard to case.
 
 | Parameter | Keeps the items |
 |---|---|
@@ -65,7 +65,32 @@ A malformed `age`, `language` or `page` answers `400` with `{"error": "bad_filte
 }
 ```
 
+## Item page
+
+`GET /api/items/{item}` answers what the website's item page shows of a shared item:
+
+```json
+{
+  "item": "<32 hex>",
+  "version": 2,
+  "...": "every field of a catalogue entry, at this version",
+  "content": {"...": "the bank or learning path, as signed"},
+  "media": [{"digest": "<64 hex>", "type": "image/png", "size": 70}],
+  "versions": [
+    {"version": 2, "published_at": "2026-11-22T10:00:00Z"},
+    {"version": 1, "published_at": "2026-11-20T18:00:00Z"}
+  ]
+}
+```
+
+- The entry is the item's catalogue entry: its latest version that is not withdrawn, signals counted when asked. An item hidden from new imports (see Reports in `interface-v1.md`) has no page.
+- `content` and `media` are those of the signed shared item at that version (`interface-v1.md`, Shared items).
+- `versions` lists every version that is not withdrawn, newest first; each can be downloaded as an item file (`interface-v1.md`, Item files) at `GET /api/items/{item}/versions/{version}/file`.
+- Its ratings and published short reviews are at `GET /api/items/{item}/ratings` (`interface-v1.md`, Ratings, For the website).
+- Comments, and the AI-generated and read-by-a-person marks of editorial content, are added here by the tickets that bring them; until then they are absent, and the website shows them only when present.
+- An item withdrawn, hidden, never published or malformed answers `404` with `{"error": "unknown_item"}`.
+
 ## HTTP
 
-- Answers are `application/json` with `Cache-Control: public, max-age=60`.
+- Answers are `application/json` with `Cache-Control: public, max-age=60`, except item files (`interface-v1.md`, Item files).
 - A database failure answers `503` with `{"error": "unavailable"}`.

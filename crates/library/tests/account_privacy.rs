@@ -29,6 +29,25 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             "/v1/ratings".into(),
             Some(json!({"library_identifier": FAMILY_A, "item": VERBS, "stars": 5})),
         ),
+        (
+            "POST",
+            "/v1/reports".into(),
+            Some(
+                json!({"library_identifier": FAMILY_A, "item": VERBS, "reason": "wrong_answer", "details": "Question 1."}),
+            ),
+        ),
+        (
+            "POST",
+            "/api/reports".into(),
+            Some(json!({"item": VERBS, "reason": "wrong_answer", "details": "Question 1."})),
+        ),
+        (
+            "GET",
+            "/v1/reports/00000000000000000000000000000000".into(),
+            None,
+        ),
+        ("GET", format!("/api/items/{VERBS}"), None),
+        ("GET", format!("/api/items/{VERBS}/versions/1/file"), None),
         ("GET", format!("/api/items/{VERBS}/ratings"), None),
         ("GET", "/api/catalogue".into(), None),
         ("GET", "/api/catalogue?q=Owl".into(), None),

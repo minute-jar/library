@@ -133,16 +133,18 @@ impl Filter {
     }
 }
 
-/// The latest version of every shared item that is not withdrawn, as the
-/// index lists them.
+/// The latest version of every shared item that is neither withdrawn nor
+/// hidden from new imports, as the index lists them.
 const LATEST: &str = "(SELECT DISTINCT ON (item) * FROM item_versions AS v
      WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+       AND NOT EXISTS (SELECT 1 FROM hidden_items AS h WHERE h.item = v.item)
      ORDER BY item, version DESC) latest";
 
 /// How many items a page of the catalogue holds.
 const PAGE_SIZE: i64 = 20;
 
-type Row = (
+/// An index entry as read by [`ENTRY_COLUMNS`].
+pub(crate) type Row = (
     String,
     i32,
     String,
@@ -208,18 +210,19 @@ fn kept<'a>(columns: &str, filter: &'a Filter) -> QueryBuilder<'a, Postgres> {
     sql
 }
 
+/// The columns of an index entry, over a version named `latest`, as [`entry`] reads them.
+pub(crate) const ENTRY_COLUMNS: &str = "latest.item, latest.version, latest.type, latest.title, latest.author_pseudonym,
+     latest.author_editorial, latest.derived_from, latest.metadata, latest.published_at,
+     (SELECT count(*) FROM imports WHERE imports.item = latest.item),
+     ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = latest.item AND ratings.stars = s)
+           FROM generate_series(1, 5) AS s ORDER BY s)";
+
 async fn browse(pool: &PgPool, filter: &Filter) -> Result<Value, sqlx::Error> {
     let (total,): (i64,) = kept("count(*)", filter)
         .build_query_as()
         .fetch_one(pool)
         .await?;
-    let mut sql = kept(
-        "item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at,
-         (SELECT count(*) FROM imports WHERE imports.item = latest.item),
-         ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = latest.item AND ratings.stars = s)
-               FROM generate_series(1, 5) AS s ORDER BY s)",
-        filter,
-    );
+    let mut sql = kept(ENTRY_COLUMNS, filter);
     sql.push(" ORDER BY published_at DESC, item LIMIT ")
         .push_bind(PAGE_SIZE)
         .push(" OFFSET ")
@@ -234,7 +237,8 @@ async fn browse(pool: &PgPool, filter: &Filter) -> Result<Value, sqlx::Error> {
     }))
 }
 
-fn entry(row: Row) -> Value {
+/// An index entry, its signals counted when asked.
+pub(crate) fn entry(row: Row) -> Value {
     let (
         item,
         version,

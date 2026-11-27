@@ -30,7 +30,7 @@ createServer((request, response) => {
 			body
 		});
 		void (accounts.fetch(asked) ?? api.fetch(asked)).then(async (answer) => {
-			response.writeHead(answer.status, { 'content-type': 'application/json' });
+			response.writeHead(answer.status, Object.fromEntries(answer.headers));
 			response.end(await answer.text());
 		});
 	});

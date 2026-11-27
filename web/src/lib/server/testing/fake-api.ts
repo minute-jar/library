@@ -2,6 +2,7 @@
 // it answers what a test sets and remembers what it was asked.
 
 import type { Entry, Filters, Page } from '../catalogue.ts';
+import type { ItemPage, Ratings } from '../items.ts';
 
 export const verbs: Entry = {
 	item: '0123456789abcdef0123456789abcdef',
@@ -49,6 +50,34 @@ export const offered: Filters = {
 	curricula: [{ country: 'GB', year: 'Year 5', topic: 'Verb forms' }]
 };
 
+/** The item page of the irregular verbs, at version 2 of 2. */
+export const verbsPage: ItemPage = {
+	...verbs,
+	signals: { families: 3, ratings: [0, 0, 1, 0, 2] },
+	content: {
+		questions: [
+			{ type: 'typed', prompt: "Past of 'go'", answers: ['went'] },
+			{ type: 'choice', prompt: "Past of 'see'", choices: ['saw', 'seed'], answers: ['saw'] }
+		],
+		lessons: [{ title: 'Strong verbs', text: 'Their vowel changes in the past.' }]
+	},
+	media: [],
+	versions: [
+		{ version: 2, published_at: '2026-11-20T18:00:00Z' },
+		{ version: 1, published_at: '2026-11-18T09:00:00Z' }
+	]
+};
+
+export const verbsRatings: Ratings = {
+	item: verbs.item,
+	ratings: [0, 0, 1, 0, 2],
+	reviews: [{ stars: 5, text: 'Learnt in a week.' }]
+};
+
+/** The item file of version 2 of the irregular verbs, as the API answers it. */
+export const verbsFile =
+	'{"contract":1,"kind":"item_file","keys":{"payload":"{}","signature":"00","key":"00"},"item":{"payload":"{}","signature":"00","key":"00"},"media":[]}';
+
 export type FakeApi = {
 	/** The catalogue API's answers, as `fetch` gives them. */
 	fetch: typeof fetch;
@@ -58,7 +87,13 @@ export type FakeApi = {
 	page: Page;
 	/** What `/api/catalogue/filters` answers next. */
 	filters: Filters;
-	/** A status `/api/catalogue` answers instead, with its error code. */
+	/** The item pages, by item. */
+	items: Record<string, ItemPage>;
+	/** The ratings, by item. */
+	ratings: Record<string, Ratings>;
+	/** The item files, by item and version (`<item>/<version>`). */
+	files: Record<string, string>;
+	/** A status `/api/catalogue` and `/api/items/...` answer instead, with its error code. */
 	failure: { status: number; error: string } | null;
 };
 
@@ -67,6 +102,9 @@ export function fakeApi(): FakeApi {
 		asked: [],
 		page: { items: [verbs, fractions], total: 2, page: 1, pages: 1 },
 		filters: offered,
+		items: { [verbs.item]: verbsPage },
+		ratings: { [verbs.item]: verbsRatings },
+		files: { [`${verbs.item}/2`]: verbsFile, [`${verbs.item}/1`]: verbsFile },
 		failure: null,
 		fetch: (input) => {
 			const url = new URL(input instanceof Request ? input.url : input.toString());
@@ -82,8 +120,28 @@ export function fakeApi(): FakeApi {
 			if (url.pathname === '/api/catalogue/filters') {
 				return Promise.resolve(Response.json(api.filters));
 			}
+			const asked = url.pathname.match(
+				/^\/api\/items\/([^/]+)(?:\/(ratings)|\/versions\/([^/]+)\/file)?$/
+			);
+			if (asked) return Promise.resolve(itemAnswer(api, asked[1], asked[2], asked[3]));
 			return Promise.resolve(Response.json({ error: 'not_found' }, { status: 404 }));
 		}
 	};
 	return api;
+}
+
+function itemAnswer(api: FakeApi, item: string, ratings?: string, version?: string): Response {
+	const { failure } = api;
+	if (failure) return Response.json({ error: failure.error }, { status: failure.status });
+	if (!api.items[item]) return Response.json({ error: 'unknown_item' }, { status: 404 });
+	if (ratings) return Response.json(api.ratings[item]);
+	if (version === undefined) return Response.json(api.items[item]);
+	const file = api.files[`${item}/${version}`];
+	if (file === undefined) return Response.json({ error: 'unknown_version' }, { status: 404 });
+	return new Response(file, {
+		headers: {
+			'content-type': 'application/json',
+			'content-disposition': `attachment; filename="minute-jar-${item}-${version}.json"`
+		}
+	});
 }

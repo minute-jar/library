@@ -12,8 +12,11 @@ mod browse;
 mod catalogue;
 mod http;
 mod imports;
+mod item_page;
 mod media;
 mod ratings;
+mod reports;
+mod review;
 mod withdrawals;
 
 use std::sync::Arc;
@@ -33,6 +36,12 @@ pub use crate::catalogue::PublishError;
 pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
 pub use crate::ratings::{ItemRatings, REVIEW_LENGTH, RatingError, Review};
+pub use crate::reports::{
+    AuthorNotification, DETAILS_LIMIT, DecideError, Decision, Effect, FormalNotice, Message,
+    NewReport, Notifier, NotifyFuture, Outcome, QueuedReport, ReportError, ReportState,
+    ReportStatus, Reporter,
+};
+pub use crate::review::{ReviewFuture, ReviewOutcome, Reviewer, Submission};
 pub use crate::withdrawals::{Reason, WithdrawError, Withdrawal};
 
 /// A question bank or a learning path.
@@ -111,6 +120,7 @@ pub struct Library {
     keys_document: Arc<catalogue::Stored>,
     media: Arc<dyn MediaStore>,
     accounts: Option<Arc<accounts::Desk>>,
+    reports: Option<Arc<reports::Desk>>,
 }
 
 impl Library {
@@ -132,6 +142,7 @@ impl Library {
             keys_document: Arc::new(catalogue::Stored::new(keys_document)),
             media: Arc::new(media),
             accounts: None,
+            reports: None,
         })
     }
 
@@ -220,6 +231,70 @@ impl Library {
         withdrawals::reactivate(&self.pool, &self.signing, item, version, now).await
     }
 
+    /// The service receiving reports: urgent ones are reviewed by `reviewer`,
+    /// reporters who left an address hear from `notifier`, and the HTTP
+    /// routes read the instant from `clock`. Without it, reports are refused
+    /// as unavailable.
+    pub fn with_reports(
+        mut self,
+        reviewer: impl Reviewer,
+        notifier: impl Notifier,
+        clock: impl Fn() -> Timestamp + Send + Sync + 'static,
+    ) -> Self {
+        self.reports = Some(Arc::new(reports::Desk {
+            reviewer: Box::new(reviewer),
+            notifier: Box::new(notifier),
+            clock: Box::new(clock),
+        }));
+        self
+    }
+
+    /// Receives a report of a shared item at `now` and follows its path;
+    /// answers the report's identifier, by which its reporter follows it.
+    pub async fn report(&self, report: NewReport, now: Timestamp) -> Result<String, ReportError> {
+        let desk = self.reports.as_ref().ok_or(ReportError::Unavailable)?;
+        reports::receive(&self.pool, &self.signing, desk, report, now).await
+    }
+
+    /// A report as its reporter may follow it.
+    pub async fn report_state(&self, report: &str) -> Result<Option<ReportState>, sqlx::Error> {
+        reports::state(&self.pool, report).await
+    }
+
+    /// Records a moderator's decision at `now`: an upheld report withdraws
+    /// the item by moderation, a rejected one puts it back; the reporter
+    /// and the author are told.
+    pub async fn decide_report(
+        &self,
+        report: &str,
+        decision: Decision,
+        now: Timestamp,
+    ) -> Result<(), DecideError> {
+        let desk = self.reports.as_ref().ok_or(DecideError::Unavailable)?;
+        reports::decide(&self.pool, &self.signing, desk, report, decision, now).await
+    }
+
+    /// Sends to a moderator the reports their author left 7 days without a
+    /// new version as of `now`, and closes those the author corrected.
+    pub async fn escalate_reports(&self, now: Timestamp) -> Result<(), ReportError> {
+        let desk = self.reports.as_ref().ok_or(ReportError::Unavailable)?;
+        Ok(reports::escalate(&self.pool, desk, now).await?)
+    }
+
+    /// The reports waiting for a moderator, oldest first.
+    pub async fn moderation_queue(&self) -> Result<Vec<QueuedReport>, sqlx::Error> {
+        reports::queue(&self.pool).await
+    }
+
+    /// What the author of `item` must be told about reports, oldest first,
+    /// kept until their library account receives it.
+    pub async fn author_notifications(
+        &self,
+        item: &str,
+    ) -> Result<Vec<AuthorNotification>, sqlx::Error> {
+        reports::author_notifications(&self.pool, item).await
+    }
+
     /// Signs the index and the withdrawal list again at `now`, before they expire.
     pub async fn refresh(&self, now: Timestamp) -> Result<(), sqlx::Error> {
         catalogue::refresh(&self.pool, &self.signing, now).await
@@ -229,6 +304,7 @@ impl Library {
     pub fn router(&self) -> axum::Router {
         http::router(self.clone())
             .merge(browse::router(self.clone()))
+            .merge(item_page::router(self.clone()))
             .merge(accounts::http::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,
