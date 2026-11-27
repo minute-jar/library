@@ -65,6 +65,9 @@
 			<p class="text-sm">
 				<a href={href('/account/sharing')} class="underline">{m.sharing_link()}</a>
 			</p>
+			<p class="text-sm">
+				<a href={href('/account/items')} class="underline">{m.items_link()}</a>
+			</p>
 			{#if form && 'renamed' in form}
 				<p role="status" class="text-sm">{m.renamed()}</p>
 			{/if}

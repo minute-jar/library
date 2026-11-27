@@ -87,6 +87,12 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             Some(common::shares::prepared("Irregular verbs, part 2")),
         ),
         ("GET", "/api/account/shares".into(), None),
+        ("GET", "/api/account/items".into(), None),
+        (
+            "POST",
+            format!("/api/account/items/{VERBS}/withdrawal"),
+            Some(json!({"version": null})),
+        ),
         ("GET", "/api/moderation/queue".into(), None),
         ("GET", format!("/api/moderation/items/{VERBS}"), None),
         ("GET", "/api/moderation/figures/2026".into(), None),
