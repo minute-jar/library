@@ -20,3 +20,15 @@ test('a visitor opens an item from the catalogue and downloads it as a file', as
 	expect(download.suggestedFilename()).toBe('minute-jar-0123456789abcdef0123456789abcdef-2.json');
 	expect(await readFile(await download.path(), 'utf8')).toBe(verbsFile);
 });
+
+test('a derived work credits its original and links to it', async ({ page }) => {
+	await page.goto('/items/00112233445566778899aabbccddeeff');
+
+	await expect(page.getByText('Derived from a work by Owl')).toBeVisible();
+	await page
+		.getByRole('link', { name: 'See the original: Irregular verbs, part 1, version 1' })
+		.click();
+
+	await expect(page).toHaveURL(/\/items\/0123456789abcdef0123456789abcdef$/);
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Irregular verbs, part 1');
+});
