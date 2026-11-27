@@ -74,7 +74,8 @@ export const verbsHistory: History = {
 			findings: null,
 			notice: rightsReport.notice
 		}
-	]
+	],
+	selection: null
 };
 
 export const figures2026: Figures = {
@@ -124,6 +125,16 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 
 		const path = url.pathname;
 		if (path === '/api/moderation/queue') return json({ cases: fake.cases });
+		const marked = path.match(/^\/api\/moderation\/items\/([^/]+)\/selection$/);
+		if (marked && (request.method === 'PUT' || request.method === 'DELETE')) {
+			const history = fake.histories[marked[1]];
+			if (!history) return refused(404, 'unknown_item');
+			history.selection =
+				request.method === 'PUT'
+					? (history.selection ?? { moderator: handle, selected_at: '2026-11-27T10:00:00Z' })
+					: null;
+			return new Response(null, { status: 204 });
+		}
 		const item = path.match(/^\/api\/moderation\/items\/([^/]+)$/);
 		if (item) {
 			const history = fake.histories[item[1]];

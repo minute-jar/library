@@ -90,6 +90,8 @@ struct Filter {
     topic: Option<String>,
     /// Words searched in the title, description, subject and topic.
     text: Option<String>,
+    /// Only the items marked Selection.
+    selection: bool,
     /// From 1.
     page: u32,
 }
@@ -120,7 +122,13 @@ impl Filter {
             None => 1,
             Some(page) => page.parse::<u32>().ok().filter(|page| *page >= 1)?,
         };
+        let selection = match text("selection").as_deref() {
+            None => false,
+            Some("true") => true,
+            Some(_) => return None,
+        };
         Some(Filter {
+            selection,
             language,
             subject: text("subject"),
             age,
@@ -156,6 +164,7 @@ pub(crate) type Row = (
     i64,
     i64,
     Vec<i64>,
+    bool,
 );
 
 /// `SELECT {columns}` over the latest version of every item that `filter`
@@ -175,6 +184,12 @@ fn kept<'a>(columns: &str, filter: &'a Filter) -> QueryBuilder<'a, Postgres> {
     sql.push(" WHERE true");
     if filter.text.is_some() {
         sql.push(" AND catalogue_search(title, metadata) @@ asked.words");
+    }
+    if filter.selection {
+        sql.push(format_args!(
+            " AND {}",
+            crate::editorial::selection::SELECTED
+        ));
     }
     if let Some(language) = &filter.language {
         sql.push(" AND (lower(metadata->>'language') = lower(")
@@ -215,7 +230,8 @@ pub(crate) const ENTRY_COLUMNS: &str = "latest.item, latest.version, latest.type
      latest.author_editorial, latest.derived_from, latest.metadata, latest.published_at,
      (SELECT count(*) FROM imports WHERE imports.item = latest.item),
      ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = latest.item AND ratings.stars = s)
-           FROM generate_series(1, 5) AS s ORDER BY s)";
+           FROM generate_series(1, 5) AS s ORDER BY s),
+     EXISTS (SELECT 1 FROM selections WHERE selections.item = latest.item)";
 
 async fn browse(pool: &PgPool, filter: &Filter) -> Result<Value, sqlx::Error> {
     let (total,): (i64,) = kept("count(*)", filter)
@@ -251,6 +267,7 @@ pub(crate) fn entry(row: Row) -> Value {
         published_at,
         families,
         ratings,
+        selection,
     ) = row;
     json!({
         "item": item,
@@ -261,7 +278,7 @@ pub(crate) fn entry(row: Row) -> Value {
         "author": {"pseudonym": pseudonym, "editorial": editorial},
         "derived_from": derived_from,
         "metadata": metadata,
-        "selection": false,
+        "selection": selection,
         "signals": {"families": families, "ratings": ratings},
         "published_at": crate::contract::time(Timestamp::from_second(published_at).expect("a stored instant")),
     })

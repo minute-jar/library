@@ -114,7 +114,16 @@ export type HistoryEntry =
 			moderator: string;
 	  };
 
-export type History = { item: string; title: string; history: HistoryEntry[] };
+/** Who marked an item Selection, and when. */
+export type Selection = { moderator: string; selected_at: string };
+
+export type History = {
+	item: string;
+	title: string;
+	history: HistoryEntry[];
+	/** Null when the item is not marked Selection. */
+	selection: Selection | null;
+};
 
 /** The yearly transparency report's figures. */
 export type Figures = {
@@ -194,6 +203,14 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 				`/api/moderation/shares/${encodeURIComponent(share)}/decision`,
 				session,
 				{ outcome, reason, reasons }
+			);
+		},
+		/** Marks the item Selection, or removes the mark; the index is signed again. */
+		mark(session: string, item: string, selected: boolean) {
+			return call<void>(
+				selected ? 'PUT' : 'DELETE',
+				`/api/moderation/items/${encodeURIComponent(item)}/selection`,
+				session
 			);
 		},
 		figures(session: string, year: number) {

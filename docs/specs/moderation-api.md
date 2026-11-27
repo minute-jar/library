@@ -54,7 +54,7 @@ A share the review held (`interface-v1.md`, Shares), not yet published, with the
 
 ## History
 
-`GET /api/moderation/items/{item}` answers `{"item", "title", "history": [...]}`, oldest first, or `404` `unknown_item`. Each entry has `at` and `event`:
+`GET /api/moderation/items/{item}` answers `{"item", "title", "history": [...], "selection"}`, the history oldest first, or `404` `unknown_item`. `selection` is `null`, or `{"moderator": "<handle>", "selected_at"}` for an item marked Selection. Each entry has `at` and `event`:
 
 - `reported`: `report`, `reason`, `details`, `effect`, `findings`, `notice`;
 - `corrected`: `report` (the author published a new version within 7 days);
@@ -70,6 +70,12 @@ A share the review held (`interface-v1.md`, Shares), not yet published, with the
 - Refusals: `400` `bad_request` (not exactly the expected object, an unknown outcome or reason), `400` `reasons_required` (empty reasons), `403` `same_moderator`, `404` `unknown_report`, `unknown_appeal` or `unknown_share`, `409` `already_decided` (decided already, or closed by the author's correction), `503` `unavailable` (reports are not turned on, or the database fails).
 
 Every decision enters the decisions log (table `moderation_decisions`, `case_kind` `report` or `held_review`): what it was on, its reason, outcome, reasons, moderator and instant.
+
+## Selection
+
+The operator's team marks Selection the shared items it read and chose (ADR-0002): `PUT /api/moderation/items/{item}/selection` sets the mark, `DELETE` the same path removes it, both with no body, answering `204`. Setting it again, or removing a mark that is not there, changes nothing and answers `204` too. The item must be one the catalogue shows, neither withdrawn nor hidden from new imports, else `404` `unknown_item`; a withdrawn item keeps its mark and has it again if it comes back. `Library::select` and `Library::unselect` do the same.
+
+The library signs the index again at once: the item's entry has `selection` true (`interface-v1.md`, Index), as do its catalogue entry and item page (`catalogue-api.md`), and `GET /api/catalogue?selection=true` keeps only marked items. The mark is not a moderation decision: it does not enter the decisions log, and only who set it, and when, is kept. Items of the editorial account get it only by being chosen, like any other.
 
 ## Transparency figures
 

@@ -79,6 +79,7 @@ async fn shown(pool: &PgPool, item: &str) -> Result<Option<Value>, sqlx::Error> 
     let mut page = entry(latest);
     page["content"] = payload["content"].clone();
     page["media"] = payload["media"].clone();
+    page["editorial"] = crate::editorial::marks(pool, item, version).await?;
     page["versions"] = versions
         .into_iter()
         .map(|(version, published_at)| {

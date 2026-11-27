@@ -30,6 +30,12 @@
 //! route: `library grant-moderator <subject> <handle>` makes the Minute Jar
 //! account `subject` a moderator known to other moderators as `handle`, and
 //! `library revoke-moderator <subject>` ends it.
+//!
+//! The operator marks its editorial account the same way (ADR-0002):
+//! `library mark-editorial <subject>` makes the library account on the
+//! Minute Jar account `subject` the editorial account, whose shares are
+//! signed as the software's publisher's, and `library unmark-editorial
+//! <subject>` ends it.
 
 use std::time::Duration;
 
@@ -88,9 +94,34 @@ async fn main() {
             );
             return;
         }
+        ["mark-editorial", subject] => {
+            library
+                .mark_editorial(subject, Timestamp::now())
+                .await
+                .unwrap_or_else(|error| {
+                    panic!("the editorial account could not be marked: {error:?}")
+                });
+            println!("the editorial account is marked");
+            return;
+        }
+        ["unmark-editorial", subject] => {
+            let unmarked = library
+                .unmark_editorial(subject)
+                .await
+                .expect("the database is reachable");
+            println!(
+                "{}",
+                if unmarked {
+                    "no longer the editorial account"
+                } else {
+                    "was not the editorial account"
+                }
+            );
+            return;
+        }
         _ => {
             eprintln!(
-                "usage: library [grant-moderator <subject> <handle> | revoke-moderator <subject>]"
+                "usage: library [grant-moderator <subject> <handle> | revoke-moderator <subject> | mark-editorial <subject> | unmark-editorial <subject>]"
             );
             std::process::exit(2);
         }

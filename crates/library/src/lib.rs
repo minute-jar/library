@@ -12,6 +12,7 @@ mod bank_format;
 mod browse;
 mod cards;
 mod catalogue;
+mod editorial;
 mod http;
 mod imports;
 mod item_page;
@@ -42,6 +43,8 @@ pub use crate::cards::{
     VerifiedBy, VerifiedCard,
 };
 pub use crate::catalogue::PublishError;
+pub use crate::editorial::EditorialError;
+pub use crate::editorial::selection::SelectionError;
 pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
 pub use crate::moderation::{
@@ -384,6 +387,47 @@ impl Library {
         moderation::grant(&self.pool, subject, handle, now).await
     }
 
+    /// Marks at `now` the library account on the Minute Jar account
+    /// `subject` as the operator's editorial account (ADR-0002): its shares
+    /// are then signed as the software's publisher's, and must say how they
+    /// were made and who read them. Only the operator does this: no route
+    /// does.
+    pub async fn mark_editorial(
+        &self,
+        subject: &str,
+        now: Timestamp,
+    ) -> Result<(), EditorialError> {
+        editorial::mark(&self.pool, subject, now).await
+    }
+
+    /// Ends the editorial mark of the library account on `subject`; answers
+    /// whether it had it.
+    pub async fn unmark_editorial(&self, subject: &str) -> Result<bool, sqlx::Error> {
+        editorial::unmark(&self.pool, subject).await
+    }
+
+    /// The moderator `moderator` marks `item` Selection at `now`; the
+    /// index is signed again.
+    pub async fn select(
+        &self,
+        moderator: &str,
+        item: &str,
+        now: Timestamp,
+    ) -> Result<(), SelectionError> {
+        editorial::selection::select(&self.pool, &self.signing, moderator, item, now).await
+    }
+
+    /// The moderator `moderator` removes the Selection mark of `item` at
+    /// `now`; the index is signed again.
+    pub async fn unselect(
+        &self,
+        moderator: &str,
+        item: &str,
+        now: Timestamp,
+    ) -> Result<(), SelectionError> {
+        editorial::selection::unselect(&self.pool, &self.signing, moderator, item, now).await
+    }
+
     /// Ends the moderator role of `subject`; answers whether it had it.
     pub async fn revoke_moderator(&self, subject: &str) -> Result<bool, sqlx::Error> {
         moderation::revoke(&self.pool, subject).await
@@ -474,6 +518,7 @@ impl Library {
             .merge(accounts::closing::router(self.clone()))
             .merge(cards::http::router(self.clone()))
             .merge(shares::http::router(self.clone()))
+            .merge(editorial::selection::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,
             ))

@@ -39,6 +39,13 @@ describe('the catalogue page', () => {
 		});
 	});
 
+	it('asks the catalogue for the Selection alone', async () => {
+		const { data, api } = await visit('/?selection=true&q=fractions');
+
+		expect(api.asked[0]).toBe('/api/catalogue?q=fractions&selection=true');
+		expect(data.query).toEqual({ q: 'fractions', selection: 'true' });
+	});
+
 	it('leaves out the filters left empty', async () => {
 		const { api } = await visit('/?q=&language=fr&age=');
 

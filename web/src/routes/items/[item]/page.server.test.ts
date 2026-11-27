@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	fakeApi,
+	fractionsPage,
 	moreVerbs,
 	verbs,
 	verbsPage,
@@ -55,8 +56,18 @@ describe('the item page', () => {
 		});
 	});
 
+	it('shows an item of the editorial account with who read it', async () => {
+		const { data } = await visit(fractionsPage.item);
+
+		expect(data.item.author).toEqual({ pseudonym: 'Minute Jar', editorial: true });
+		expect(data.item.editorial).toEqual({
+			ai_generated: true,
+			read: { by: 'moderator', handle: 'Heron', at: '2026-11-20T09:00:00Z' }
+		});
+	});
+
 	it('answers 404 for an item the catalogue does not show', async () => {
-		await expect(visit('fedcba9876543210fedcba9876543210')).rejects.toMatchObject({
+		await expect(visit('ffffffffffffffffffffffffffffffff')).rejects.toMatchObject({
 			status: 404
 		});
 	});

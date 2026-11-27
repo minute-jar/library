@@ -203,9 +203,12 @@ async fn history(
         .map_err(unavailable)?
         .ok_or_else(|| refused(StatusCode::NOT_FOUND, "unknown_item"))?;
     let entries: Vec<Value> = history.entries.iter().map(entry_json).collect();
+    let selection = crate::editorial::selection::of_item(&library.pool, &item)
+        .await
+        .map_err(unavailable)?;
     Ok(answer(
         StatusCode::OK,
-        json!({"item": history.item, "title": history.title, "history": entries}),
+        json!({"item": history.item, "title": history.title, "history": entries, "selection": selection}),
     ))
 }
 
