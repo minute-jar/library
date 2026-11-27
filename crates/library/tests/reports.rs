@@ -402,7 +402,11 @@ async fn an_implausible_report_hides_the_item_from_new_imports_only() {
 #[tokio::test]
 async fn a_rejected_report_puts_the_switched_off_item_back_by_itself() {
     let moderated = moderated_with(Some(ReviewOutcome::Refused {
-        reasons: "An explicit picture".into(),
+        reasons: vec![library::RefusalReason {
+            question: Some(1),
+            reason: Reason::SexualContent,
+            explanation: "An explicit picture".into(),
+        }],
     }))
     .await;
     let id = report_id(

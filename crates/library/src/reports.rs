@@ -437,7 +437,19 @@ async fn urgent_effect(
     Ok(match desk.reviewer.review(submission).await {
         Ok(ReviewOutcome::Published) => (Effect::Hidden, None),
         Ok(ReviewOutcome::Held { findings }) => (Effect::SwitchedOff, Some(findings)),
-        Ok(ReviewOutcome::Refused { reasons }) => (Effect::SwitchedOff, Some(reasons)),
+        Ok(ReviewOutcome::Refused { reasons }) => (
+            Effect::SwitchedOff,
+            Some(
+                reasons
+                    .iter()
+                    .map(crate::review::RefusalReason::line)
+                    .collect::<Vec<_>>()
+                    .join(
+                        "
+",
+                    ),
+            ),
+        ),
         // A child may be at stake: the item is switched off until a moderator decides.
         Err(_) => (
             Effect::SwitchedOff,

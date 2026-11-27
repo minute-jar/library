@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports, ratings and reports. Suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports, ratings, reports and shares. Suggestions are added by a later ticket of `docs/tickets/step-1.md`.
 
 ## Signed documents
 
@@ -289,6 +289,53 @@ Content-Type: application/json
 - What a report does at once: for `personal_data`, `sexual_content` or `illegal_content`, the item is reviewed again on that reason; if the report is plausible, or if two families that imported the item reported it for one of these reasons, the item is switched off (`kind` `switch_off` in the withdrawal list), otherwise it leaves the index while still served to the families that have it (hidden from new imports). For `rights`, the item is hidden from new imports once three distinct library identifiers that imported it reported it, or at once on a formal notice. Other reasons change nothing until a moderator decides.
 - A moderator's decision that upholds a report withdraws the item (`kind` `moderation`, with the report's reason); one that rejects it ends the switch-off or the hiding once no other report for the same reasons waits.
 - Refusals: a malformed identifier `400 {"error": "bad_library_identifier"}`; an unknown reason `400 {"error": "bad_reason"}`; a contact that is not an e-mail address `400 {"error": "bad_contact"}`; a notice without a name, a work or a contact, or for another reason than `rights`, `400 {"error": "bad_notice"}`; a body that is not the expected object, or details too long, `400 {"error": "bad_request"}`; an unknown item `404 {"error": "unknown_item"}`; an unknown report `404 {"error": "unknown_report"}`.
+
+## Shares
+
+A parent shares a bank or a learning path from the parent app, under their library account (stories S10, S13, S16). The family server prepares the item (recorded sound removed, picture metadata erased, the family's names searched for; main repository, sharing preparation), and the parent app sends it with the library account's **session** (`accounts-api.md`), never with the family server's library identifier. It is the one call of this contract that carries a session, so it lives under `/api/`, beside sign-in, and every `POST` under `/v1/` stays anonymous.
+
+```
+POST /api/shares
+Authorization: Bearer <session>
+Content-Type: application/json
+
+{"type": "bank", "title": "Irregular verbs, part 1",
+ "metadata": {"language": "en-GB", "subject": "english", "ages": {"min": 9, "max": 11},
+              "description": "...", "curriculum": {"country": "GB", "year": "Year 5", "topic": "Verb forms"}},
+ "content": {"...": "the bank or learning path in the bank format"},
+ "media": [{"base64": "<the file's bytes>"}],
+ "sharing_terms": "2026-11"}
+```
+
+- `type`, `title` (1 to 120 characters once trimmed), `metadata` (as in the index; `description` at most 2000 characters, `curriculum` may be `null`) and `content` are required; `media` lists the item's pictures and sounds, each file's bytes in base64 (RFC 4648, with padding), and may be left out. The library draws the shared item's identifier.
+- **Sharing terms.** `GET /api/sharing-terms` answers `{"version": "2026-11", "shares_per_day": 10}`. An account accepts the terms in force at its first share, by sending their version as `sharing_terms`, or beforehand on the website (`PUT /api/account/sharing-terms` with `{"version"}`, `409 outdated_sharing_terms` for another version). When the terms change, the next share accepts the new version. Without it the share answers `403 {"error": "sharing_terms_required"}`; the parent app shows the terms and sends the share again with their version.
+- The share is **reviewed** (ADR-0005) before anything is public. The answer, with `Cache-Control: private, no-store`, is the share:
+
+  ```json
+  {"share": "<32 hex>", "item": "<32 hex>", "title": "Irregular verbs, part 1", "outcome": "published",
+   "version": 1, "reasons": [], "shared_at": "2026-11-27T10:00:00Z"}
+  ```
+
+  - `201`, `outcome` `published`: the version is in the next index under the account's pseudonym, as the account has it at the share, and served at `/v1/items/{item}/versions/{version}`.
+  - `202`, `outcome` `held`: held for a moderator, who publishes or refuses it; `version` is `null` until published. What the review found is for the moderator and is not answered.
+  - `200`, `outcome` `refused`: nothing is published, `item` is `null`, and `reasons` says why, per question, for the author to correct and share again:
+
+    ```json
+    [{"question": 2, "reason": "wrong_answer", "explanation": "The past of 'see' is 'saw'."},
+     {"question": null, "reason": "rights", "explanation": "Looks copied from a textbook."}]
+    ```
+
+    `question` is the question's or lesson card's place in `content`, from 1, or `null` for the whole item; `reason` one of the codes of the withdrawal list; `explanation` in the item's language.
+- **Quota.** An account shares at most 10 items a day (UTC), whatever the outcome: the review costs the operator at every share. Beyond, `429 {"error": "share_quota_reached", "shares_per_day": 10, "next_share_at": "2026-11-28T00:00:00Z"}`. A share the review could not handle (`503`) does not count.
+- `GET /api/account/shares`, with the session, answers the author's shares, newest first, with the terms and the quota, for the website:
+
+  ```json
+  {"sharing_terms": {"current": "2026-11", "accepted": "2026-11"},
+   "quota": {"shares_per_day": 10, "shared_today": 2, "next_share_at": null},
+   "shares": [<share>, ...]}
+  ```
+- Refusals, in this order: a body carrying `library_identifier` `400 {"error": "library_identifier_not_allowed"}` (nothing is read further, nothing kept); `503 unavailable` until the service is given a reviewer; `401 signed_out`; a body that is not the expected object `400 bad_request`; `403 strong_sign_in_required` (a recent strong sign-in, as for opening an account); `404 no_account`; `403 card_required` (the account's card is not verified, `accounts-api.md`, Card); `403 sharing_terms_required`; `400 bad_item` (title or metadata); `400 bad_content` (not in the bank format); `400 medium_too_large`, `media_too_large` or `unsupported_medium` (see Media); `429 share_quota_reached`; `503 unavailable` when the review cannot be reached.
+- Every share, whatever its outcome, is written to the account's sharing log, identification data kept for the legal period after the last share (`accounts-api.md`, Closing). Each shared item is joined to the account that answers for it, so that its author hears of reports and decisions and may appeal them.
 
 ## HTTP
 

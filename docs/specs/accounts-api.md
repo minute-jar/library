@@ -31,7 +31,7 @@ The session lasts 30 days. It travels as `Authorization: Bearer <session>` on ev
 
 ### Strong and recent
 
-The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening and closing a library account, and verifying its card, need a recent strong sign-in; sharing (ticket 12) and linking a subscription will too.
+The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening and closing a library account, verifying its card and sharing (`interface-v1.md`, Shares) need a recent strong sign-in; linking a subscription will too.
 
 ## Session
 
@@ -67,7 +67,7 @@ An account, as its owner sees it:
 - The items it shared stay published under their licence, with its pseudonym: their signed versions do not change.
 - Its pseudonym stays reserved: no account may take it again, without regard to case.
 - The library account is no longer joined to the Minute Jar account, whose next sign-in finds no account and may open another, under another pseudonym.
-- Its identification data, its identification and its verified card (`identification_cards`), is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Sharing (ticket 12) records the last share in `identifications.last_shared_at`.
+- Its identification data, its identification and its verified card (`identification_cards`), is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Every share (`interface-v1.md`, Shares) records its instant in `identifications.last_shared_at`.
 
 ## Card
 

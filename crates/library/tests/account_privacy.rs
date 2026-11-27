@@ -75,6 +75,18 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
         ("GET", "/api/account/card".into(), None),
         ("POST", "/api/account/card".into(), None),
         ("POST", "/api/account/card/check".into(), None),
+        ("GET", "/api/sharing-terms".into(), None),
+        (
+            "PUT",
+            "/api/account/sharing-terms".into(),
+            Some(json!({"version": common::shares::TERMS})),
+        ),
+        (
+            "POST",
+            "/api/shares".into(),
+            Some(common::shares::prepared("Irregular verbs, part 2")),
+        ),
+        ("GET", "/api/account/shares".into(), None),
         // Closing ends the session: last but one.
         ("DELETE", "/api/account".into(), None),
         ("DELETE", "/api/session".into(), None),
@@ -99,8 +111,9 @@ fn assert_keeps_secrets(answer: &Answer, what: &str) {
 
 #[tokio::test]
 async fn no_route_answers_the_e_mail_or_the_minute_jar_account() {
-    // With cards on, so that the card routes answer as in deployment.
+    // With cards and sharing on, so that their routes answer as in deployment.
     let (library, provider, _, _, _) = common::cards::with_cards().await;
+    let library = library.with_sharing(common::shares::FakeReviewer::default());
     library
         .publish_version(
             library::NewVersion {

@@ -1,4 +1,4 @@
-// The catalogue and accounts APIs' answers for the smoke tests, on
+// The catalogue, accounts and sharing APIs' answers for the smoke tests, on
 // 127.0.0.1:4174, a fake identity provider at `/authorize` that signs in
 // at once and sends the browser back to the website's callback page, and a
 // fake payment provider at `/setup/<check>` that verifies the card at once
@@ -8,11 +8,13 @@ import { createServer } from 'node:http';
 import { fakeApi } from '../src/lib/server/testing/fake-api.ts';
 import { fakeAccounts } from '../src/lib/server/testing/fake-accounts.ts';
 import { fakeCards } from '../src/lib/server/testing/fake-cards.ts';
+import { fakeShares } from '../src/lib/server/testing/fake-shares.ts';
 
 const root = 'http://127.0.0.1:4174';
 const api = fakeApi();
 const accounts = fakeAccounts(root);
 const cards = fakeCards(accounts, root);
+const shares = fakeShares(accounts);
 
 createServer((request, response) => {
 	const url = new URL(request.url ?? '/', root);
@@ -39,7 +41,12 @@ createServer((request, response) => {
 			headers: request.headers as Record<string, string>,
 			body
 		});
-		void (cards.fetch(asked) ?? accounts.fetch(asked) ?? api.fetch(asked)).then(async (answer) => {
+		void (
+			shares.fetch(asked) ??
+			cards.fetch(asked) ??
+			accounts.fetch(asked) ??
+			api.fetch(asked)
+		).then(async (answer) => {
 			response.writeHead(answer.status, Object.fromEntries(answer.headers));
 			response.end(await answer.text());
 		});

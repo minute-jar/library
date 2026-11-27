@@ -8,6 +8,7 @@
 pub mod contract;
 
 mod accounts;
+mod bank_format;
 mod browse;
 mod cards;
 mod catalogue;
@@ -18,6 +19,7 @@ mod media;
 mod ratings;
 mod reports;
 mod review;
+mod shares;
 mod withdrawals;
 
 use std::sync::Arc;
@@ -47,7 +49,8 @@ pub use crate::reports::{
     NewReport, Notifier, NotifyFuture, Outcome, QueuedReport, ReportError, ReportState,
     ReportStatus, Reporter,
 };
-pub use crate::review::{ReviewFuture, ReviewOutcome, Reviewer, Submission};
+pub use crate::review::{RefusalReason, ReviewFuture, ReviewOutcome, Reviewer, Submission};
+pub use crate::shares::{SHARES_PER_DAY, SHARING_TERMS};
 pub use crate::withdrawals::{Reason, WithdrawError, Withdrawal};
 
 /// A question bank or a learning path.
@@ -128,6 +131,7 @@ pub struct Library {
     accounts: Option<Arc<accounts::Desk>>,
     cards: Option<Arc<cards::Desk>>,
     reports: Option<Arc<reports::Desk>>,
+    sharing: Option<Arc<shares::Desk>>,
 }
 
 impl Library {
@@ -151,6 +155,7 @@ impl Library {
             accounts: None,
             cards: None,
             reports: None,
+            sharing: None,
         })
     }
 
@@ -210,6 +215,17 @@ impl Library {
         kept_for: jiff::SignedDuration,
     ) -> Result<(), sqlx::Error> {
         accounts::closing::erase_identifications(&self.pool, now, kept_for).await
+    }
+
+    /// Turns on sharing from library accounts: every share is reviewed by
+    /// `reviewer` (ADR-0005). Needs [`Library::with_accounts`] and
+    /// [`Library::with_cards`] (a share needs a verified card); without it,
+    /// the sharing routes are refused as unavailable.
+    pub fn with_sharing(mut self, reviewer: impl Reviewer) -> Self {
+        self.sharing = Some(Arc::new(shares::Desk {
+            reviewer: Box::new(reviewer),
+        }));
+        self
     }
 
     /// Publishes the next version of a shared item; answers its version number.
@@ -352,6 +368,7 @@ impl Library {
             .merge(accounts::http::router(self.clone()))
             .merge(accounts::closing::router(self.clone()))
             .merge(cards::http::router(self.clone()))
+            .merge(shares::http::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,
             ))
