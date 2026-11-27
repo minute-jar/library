@@ -290,6 +290,38 @@ Content-Type: application/json
 - A moderator's decision that upholds a report withdraws the item (`kind` `moderation`, with the report's reason); one that rejects it ends the switch-off or the hiding once no other report for the same reasons waits.
 - Refusals: a malformed identifier `400 {"error": "bad_library_identifier"}`; an unknown reason `400 {"error": "bad_reason"}`; a contact that is not an e-mail address `400 {"error": "bad_contact"}`; a notice without a name, a work or a contact, or for another reason than `rights`, `400 {"error": "bad_notice"}`; a body that is not the expected object, or details too long, `400 {"error": "bad_request"}`; an unknown item `404 {"error": "unknown_item"}`; an unknown report `404 {"error": "unknown_report"}`.
 
+### Appeals
+
+The reporter of a decided report may appeal the decision within six months, once; another moderator than the one who decided looks again (`moderation-api.md`). Knowing the report's identifier is what makes the reporter.
+
+```
+POST /v1/reports/{report}/appeal
+Content-Type: application/json
+
+{"statement": "Page 12 of English Grammar, Year 5."}
+```
+
+```
+POST /api/reports/{report}/appeal
+Content-Type: application/json
+
+{"statement": "...", "contact": "reporter@example.org"}
+```
+
+- A family server's appeal carries only `statement` (at most 2000 characters); the website's may add `contact`, kept only until the appeal's decision is sent.
+- The answer is `202 Accepted` with `{"appeal": "<32 hex>"}` and `Cache-Control: no-store`.
+- `GET /v1/appeals/{appeal}` answers where it stands, with `Cache-Control: no-store`:
+
+  ```json
+  {"appeal": "<32 hex>", "report": "<32 hex>", "status": "reversed",
+   "received_at": "2026-11-27T10:01:00Z",
+   "decision": {"outcome": "reversed", "reasons": "...", "decided_at": "2026-11-27T11:00:00Z"}}
+  ```
+
+  `status` is `waiting`, `maintained` or `reversed`; `decision` is `null` until decided. A reversal also changes the report: `GET /v1/reports/{report}` then answers the new status (`upheld` or `rejected`) with the appeal's reasons, and the withdrawal list follows it.
+- Refusals: an empty statement `400 {"error": "statement_required"}`; a contact that is not an e-mail address `400 {"error": "bad_contact"}`; a body that is not the expected object (a family server's `contact` among others), or a statement too long, `400 {"error": "bad_request"}`; an unknown report `404 {"error": "unknown_report"}`; a report not decided yet, or closed by its author's correction, `409 {"error": "not_decided"}`; more than six months after the decision `409 {"error": "too_late"}`; a second appeal of the same report `409 {"error": "already_appealed"}`; an unknown appeal `404 {"error": "unknown_appeal"}`.
+- The author's appeal goes through their library account, once items are joined to it (ticket 13); until then, `Library::appeal` with `Appellant::Author`.
+
 ## HTTP
 
 - Every signed document is served as `application/json` with a strong `ETag`; a request whose `If-None-Match` names it answers `304 Not Modified` without a body.

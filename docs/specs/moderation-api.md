@@ -1,0 +1,78 @@
+---
+title: Moderation API
+status: draft
+---
+
+# Moderation API
+
+The JSON API behind the website's administration pages for moderators (stories S22 and S26): one queue of what waits for a decision, the history of each item, decisions with reasons, appeals, and the decisions log read as the yearly transparency report's figures. Like the accounts API (`accounts-api.md`), it is the service's own API, read by its website's server, and may change with it. Code: `crates/library/src/moderation/`. The appeals of reporters, which family servers send too, are part of the interface (`interface-v1.md`, Appeals).
+
+## Moderators
+
+The operator names moderators, never a route: `library grant-moderator <subject> <handle>` (or `Library::grant_moderator`) makes the Minute Jar account `subject` a moderator, known to other moderators as `handle` (1 to 32 characters, unique without regard to case); `library revoke-moderator <subject>` ends it. The subject is never answered; decisions name the moderator by handle.
+
+Every route under `/api/moderation/` carries the session as `Authorization: Bearer <session>` (`accounts-api.md`) and is refused, in this order:
+
+- `401` `signed_out`: no valid session;
+- `403` `not_a_moderator`: the session's Minute Jar account is not a moderator;
+- `403` `passkey_sign_in_required`: the sign-in did not use a passkey (`amr` holding `passkey` or `webauthn`), or is older than 15 minutes. A second factor or an external provider is strong, but not enough to moderate (ADR-0006). The website sends the moderator to `/sign-in?strong&return=moderation`.
+
+## Queue
+
+`GET /api/moderation/queue` answers `{"cases": [...]}`, oldest first. Each case is due 48 hours after it reached the queue (`due_at`). A report waiting for a moderator:
+
+```json
+{"kind": "report", "report": "<32 hex>", "item": "<32 hex>", "title": "Irregular verbs",
+ "version": 1, "reason": "rights", "details": "...", "effect": "hidden",
+ "findings": null, "notice": {"name": "Example Publishing", "work": "English Grammar, Year 5"},
+ "received_at": "2026-11-27T10:00:00Z", "due_at": "2026-11-29T10:00:00Z"}
+```
+
+`version` is the item's latest version when the report arrived; `effect` is what the report did at once (`none`, `switched_off`, `hidden`); `findings` what the review found. The reporter's address and library identifier are never answered.
+
+An appeal waiting for another moderator, with the decision it is against:
+
+```json
+{"kind": "appeal", "appeal": "<32 hex>", "report": "<32 hex>", "item": "<32 hex>",
+ "title": "Irregular verbs", "reason": "rights", "appellant": "reporter", "statement": "...",
+ "decision": {"outcome": "rejected", "reasons": "...", "moderator": "Alice",
+              "decided_at": "2026-11-27T10:00:00Z"},
+ "received_at": "2026-11-27T10:01:00Z", "due_at": "2026-11-29T10:01:00Z"}
+```
+
+Versions held by the review with its findings (ticket 13) will be a third `kind`, `held_review`.
+
+## History
+
+`GET /api/moderation/items/{item}` answers `{"item", "title", "history": [...]}`, oldest first, or `404` `unknown_item`. Each entry has `at` and `event`:
+
+- `reported`: `report`, `reason`, `details`, `effect`, `findings`, `notice`;
+- `corrected`: `report` (the author published a new version within 7 days);
+- `decided`: `report`, `reason`, `outcome` (`upheld` or `rejected`), `reasons`, `moderator`;
+- `appealed`: `appeal`, `report`, `appellant` (`author` or `reporter`), `statement`;
+- `appeal_decided`: `appeal`, `report`, `outcome` (`maintained` or `reversed`), `reasons`, `moderator`.
+
+## Decisions
+
+- `POST /api/moderation/reports/{report}/decision` with `{"outcome": "upheld" | "rejected", "reasons": "..."}` answers `204`. An upheld report withdraws the item by moderation for the report's reason; a rejected one ends the switch-off or the hiding once no other report for the same reasons waits (`interface-v1.md`, Reports). The reasons go to the reporter (by e-mail through the notifier if they left an address, otherwise in `GET /v1/reports/{report}`) and to the author (`Library::author_notifications`, until accounts deliver them).
+- `POST /api/moderation/appeals/{appeal}/decision` with `{"outcome": "maintained" | "reversed", "reasons": "..."}` answers `204`. It must come from another moderator than the one who decided the report. A reversal undoes the decision: an upheld report becomes rejected and the item comes back (unless another upheld report keeps it withdrawn), a rejected one becomes upheld and the item is withdrawn; the report's status and decision then read the appeal's. The reasons go to the author, and to the reporter who appealed and left an address.
+- Refusals: `400` `bad_request` (not exactly the expected object, an unknown outcome), `400` `reasons_required` (empty reasons), `403` `same_moderator`, `404` `unknown_report` or `unknown_appeal`, `409` `already_decided` (decided already, or closed by the author's correction), `503` `unavailable` (reports are not turned on, or the database fails).
+
+Every decision enters the decisions log (table `moderation_decisions`): what it was on, its reason, outcome, reasons, moderator and instant.
+
+## Transparency figures
+
+`GET /api/moderation/figures/{year}` answers the figures of the yearly transparency report for `year` (UTC), which name no item, reporter, author or moderator:
+
+```json
+{"year": 2026,
+ "reports": [{"reason": "other", "received": 2}],
+ "decisions": [{"reason": "other", "outcome": "rejected", "count": 2}],
+ "appeals": [{"appellant": "author", "outcome": "reversed", "count": 1}]}
+```
+
+`reports` counts the reports received in the year by reason; `decisions` the moderators' decisions on reports made in the year (not their appeals) by reason and outcome; `appeals` the appeals received in the year by appellant and where they stand (`waiting`, `maintained`, `reversed`). Each list is ordered by its codes. A year that is not a number answers `400` `bad_request`. `Library::transparency_figures` answers the same.
+
+## HTTP
+
+Every answer is `application/json` with `Cache-Control: private, no-store`; no answer carries an e-mail address or a Minute Jar account's subject (`tests/account_privacy.rs`).

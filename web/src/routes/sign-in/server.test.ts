@@ -105,6 +105,29 @@ describe('signing in', () => {
 		expect(unknown.location).toBe('/account?sign_in=failed');
 	});
 
+	it('comes back to the moderation queue when a moderator signs in again from it', async () => {
+		const { event: start, cookies: started } = event('/sign-in?strong&return=moderation');
+		await redirected(signIn(start));
+		const api = fakeAccounts();
+		const cookies = fakeCookies({ [SIGN_IN_COOKIE]: 'state-1.fr.moderation' });
+		await api.fetch(new Request('https://api.example/api/sign-in', { method: 'POST', body: '{}' }));
+
+		const to = await redirected(
+			callback(event('/sign-in/callback?code=code-state-1&state=state-1', api, cookies).event)
+		);
+
+		expect(started.written[SIGN_IN_COOKIE].value).toBe('state-1.en.moderation');
+		expect(to.location).toBe('/fr/moderation');
+	});
+
+	it('comes back to the account page for any other return', async () => {
+		const { event: start, cookies } = event('/sign-in?return=https://elsewhere.example');
+
+		await redirected(signIn(start));
+
+		expect(cookies.written[SIGN_IN_COOKIE].value).toBe('state-1.en');
+	});
+
 	it('signs out at the service and forgets the session', async () => {
 		const api = fakeAccounts();
 		const session = api.signedIn('subject-1');
