@@ -167,6 +167,7 @@ pub(crate) async fn sign_index(
                 (SELECT count(*) FROM imports WHERE imports.item = v.item)
          FROM item_versions AS v
          WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+           AND NOT EXISTS (SELECT 1 FROM hidden_items AS h WHERE h.item = v.item)
          ORDER BY item, version DESC",
     )
     .fetch_all(&mut **tx)
