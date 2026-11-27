@@ -7,6 +7,10 @@
 //! - `LIBRARY_MEDIA_DIR`: the directory holding the media of shared items,
 //!   until the S3-compatible store is wired at deployment;
 //! - `LIBRARY_LISTEN`: the address to listen on, `127.0.0.1:8080` by default.
+//!
+//! Sign-in with a Minute Jar account stays off (its routes answer
+//! `unavailable`) until the identity service's adapter is wired, with the
+//! identity service of `minute-jar/hosting` (ADR-0006).
 
 use std::time::Duration;
 
@@ -46,6 +50,17 @@ async fn main() {
             tokio::time::sleep(Duration::from_secs(6 * 3600)).await;
             if let Err(error) = refreshing.refresh(Timestamp::now()).await {
                 eprintln!("the index and the withdrawal list could not be signed again: {error}");
+            }
+        }
+    });
+
+    // A sign-in's e-mail is kept only while the sign-in is recent.
+    let forgetting = library.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(Duration::from_secs(5 * 60)).await;
+            if let Err(error) = forgetting.forget_sign_ins(Timestamp::now()).await {
+                eprintln!("expired sessions and sign-ins could not be forgotten: {error}");
             }
         }
     });

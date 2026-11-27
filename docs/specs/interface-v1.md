@@ -176,6 +176,8 @@ The library keeps an identifier only with what the call needs for its effect (fo
 
 A malformed identifier answers `400` with `{"error": "bad_library_identifier"}`; a body that is not the expected JSON object answers `400` with `{"error": "bad_request"}`.
 
+A `POST` under `/v1/` that carries an `Authorization` header (where a library account's session travels, `accounts-api.md`) answers `400` with `{"error": "session_not_allowed"}` and has no effect.
+
 ## Imports
 
 When a family server imports a shared item into its family library, it tells the library once:

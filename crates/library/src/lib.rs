@@ -7,6 +7,7 @@
 
 pub mod contract;
 
+mod accounts;
 mod browse;
 mod catalogue;
 mod http;
@@ -24,6 +25,10 @@ use sqlx::PgPool;
 
 use crate::contract::SigningKey;
 
+pub use crate::accounts::{
+    Account, AccountError, Authorization, IdToken, IdentityProvider, MinuteJarAccount,
+    ProviderError, ProviderFuture, code_challenge,
+};
 pub use crate::catalogue::PublishError;
 pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
@@ -105,6 +110,7 @@ pub struct Library {
     signing: Arc<SigningKey>,
     keys_document: Arc<catalogue::Stored>,
     media: Arc<dyn MediaStore>,
+    accounts: Option<Arc<accounts::Desk>>,
 }
 
 impl Library {
@@ -125,7 +131,30 @@ impl Library {
             signing: Arc::new(signing),
             keys_document: Arc::new(catalogue::Stored::new(keys_document)),
             media: Arc::new(media),
+            accounts: None,
         })
+    }
+
+    /// Turns on sign-in with a Minute Jar account through `provider` and the
+    /// library accounts opened on them; their routes read the instant from
+    /// `clock`. Without it, they are refused as unavailable.
+    pub fn with_accounts(
+        mut self,
+        provider: impl IdentityProvider,
+        clock: impl Fn() -> Timestamp + Send + Sync + 'static,
+    ) -> Self {
+        self.accounts = Some(Arc::new(accounts::Desk {
+            provider: Box::new(provider),
+            clock: Box::new(clock),
+        }));
+        self
+    }
+
+    /// Forgets at `now` what sign-in no longer needs: expired sessions,
+    /// sign-ins that never came back, and the e-mail of sign-ins no longer
+    /// recent. To be called every few minutes.
+    pub async fn forget_sign_ins(&self, now: Timestamp) -> Result<(), sqlx::Error> {
+        accounts::forget(&self.pool, now).await
     }
 
     /// Publishes the next version of a shared item; answers its version number.
@@ -198,6 +227,11 @@ impl Library {
 
     /// The HTTP interface.
     pub fn router(&self) -> axum::Router {
-        http::router(self.clone()).merge(browse::router(self.clone()))
+        http::router(self.clone())
+            .merge(browse::router(self.clone()))
+            .merge(accounts::http::router(self.clone()))
+            .layer(axum::middleware::from_fn(
+                accounts::http::refuse_sessions_on_family_routes,
+            ))
     }
 }

@@ -73,6 +73,11 @@ fn server_url() -> String {
 
 /// A library over a database of its own.
 pub async fn library() -> Library {
+    library_and_database().await.0
+}
+
+/// A library over a database of its own, and that database's address.
+pub async fn library_and_database() -> (Library, String) {
     static NEXT: AtomicU32 = AtomicU32::new(0);
     let server = server_url();
     let name = format!(
@@ -98,7 +103,7 @@ pub async fn library() -> Library {
         .join("minute-jar-library-tests")
         .join(&name);
     let _ = std::fs::remove_dir_all(&media);
-    Library::open(
+    let library = Library::open(
         pool,
         signing(),
         keys_document(),
@@ -106,7 +111,8 @@ pub async fn library() -> Library {
         at("2026-11-26T00:00:00Z"),
     )
     .await
-    .unwrap()
+    .unwrap();
+    (library, format!("{server}/{name}"))
 }
 
 pub struct Answer {
@@ -253,3 +259,5 @@ pub fn pixel() -> Vec<u8> {
 
 /// The SHA-256 digest of [`pixel`], worked out apart from the service.
 pub const PIXEL: &str = "497790947d4666760ce38f3c00e852c71fdb66cae849bae8e9ede352719e1581";
+
+pub mod identity;
