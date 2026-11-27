@@ -28,6 +28,7 @@
 		return { count, average };
 	});
 
+	const page = (id: string) => resolve(localizeHref(`/items/${id}`) as Path);
 	const file = (version: number) =>
 		resolve(localizeHref(`/items/${item.item}/versions/${version}/file`) as Path);
 	const list = (values: string[]) =>
@@ -72,8 +73,16 @@
 			{#if item.read_by_person}<Badge variant="outline">{m.item_read_by_person()}</Badge>{/if}
 		</div>
 		<div class="grid gap-1 text-sm text-muted-foreground" lang={getLocale()}>
-			{#if item.derived_from}
-				<p>{m.derived_from({ pseudonym: item.derived_from.pseudonym })}</p>
+			{#if data.original}
+				<p>
+					{m.derived_from({ pseudonym: data.original.pseudonym })}
+					{#if data.original.title !== null}
+						·
+						<a href={page(data.original.item)} class="underline underline-offset-4">
+							{m.item_original({ title: data.original.title, version: data.original.version })}
+						</a>
+					{/if}
+				</p>
 			{/if}
 			{#if item.signals.families > 0}
 				<p>{m.item_families({ count: item.signals.families })}</p>

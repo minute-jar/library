@@ -6,6 +6,7 @@ use jiff::Timestamp;
 use serde_json::Value;
 use sqlx::PgPool;
 
+use super::versions::{Shown, derivation};
 use super::{Kind, Prepared};
 use crate::moderation::{Logged, log, moderator};
 use crate::review::RefusalReason;
@@ -186,11 +187,15 @@ pub(crate) async fn decide(
             .bind(now.as_second())
             .execute(&mut *transaction)
             .await?;
-            // Never published: no author answers for it.
-            sqlx::query("DELETE FROM authored_items WHERE item = $1")
-                .bind(&item)
-                .execute(&mut *transaction)
-                .await?;
+            // Never published: no author answers for it. A refused new
+            // version leaves its item's author.
+            sqlx::query(
+                "DELETE FROM authored_items AS a WHERE a.item = $1
+                 AND NOT EXISTS (SELECT 1 FROM item_versions AS v WHERE v.item = a.item)",
+            )
+            .bind(&item)
+            .execute(&mut *transaction)
+            .await?;
         }
     }
     log(
@@ -226,6 +231,14 @@ async fn publish(
     now: Timestamp,
 ) -> Option<u32> {
     let prepared: Prepared = serde_json::from_value(submission).ok()?;
-    let version = prepared.version(item, pseudonym).ok()?;
+    let derived_from = derivation(
+        &library.pool,
+        Some(item),
+        prepared.derived_from.as_ref(),
+        Shown::NotRequired,
+    )
+    .await
+    .ok()?;
+    let version = prepared.version(item, pseudonym, derived_from).ok()?;
     library.publish_version(version, now).await.ok()
 }
