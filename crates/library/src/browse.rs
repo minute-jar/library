@@ -133,10 +133,11 @@ impl Filter {
     }
 }
 
-/// The latest version of every shared item that is not withdrawn, as the
-/// index lists them.
+/// The latest version of every shared item that is neither withdrawn nor
+/// hidden from new imports, as the index lists them.
 const LATEST: &str = "(SELECT DISTINCT ON (item) * FROM item_versions AS v
      WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+       AND NOT EXISTS (SELECT 1 FROM hidden_items AS h WHERE h.item = v.item)
      ORDER BY item, version DESC) latest";
 
 /// How many items a page of the catalogue holds.

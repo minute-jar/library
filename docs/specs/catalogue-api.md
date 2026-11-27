@@ -40,7 +40,7 @@ The JSON API through which the website browses and searches the public library (
 }
 ```
 
-Each entry has the fields of an index entry (`interface-v1.md`, Index), its signals counted when asked; a withdrawn item is left out, and a withdrawn version gives way to the latest one before it, as in the index. Every parameter is optional; together they narrow the catalogue to the items that match all of them. Values are compared without regard to case.
+Each entry has the fields of an index entry (`interface-v1.md`, Index), its signals counted when asked; a withdrawn item or one hidden from new imports (`interface-v1.md`, Reports) is left out, and a withdrawn version gives way to the latest one before it, as in the index. Every parameter is optional; together they narrow the catalogue to the items that match all of them. Values are compared without regard to case.
 
 | Parameter | Keeps the items |
 |---|---|
