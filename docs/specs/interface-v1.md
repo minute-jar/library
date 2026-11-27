@@ -254,6 +254,51 @@ GET /api/items/{item}/ratings
 - `reviews` holds only published short reviews, highest rated first, with nothing that tells families apart: no identifier, no time.
 - An unknown item answers `404` with `{"error": "unknown_item"}`.
 
+## Suggestions
+
+A family that used an imported item may suggest other answers to accept for one of its questions (story S18), for example a spelling its child typed that the item marked wrong:
+
+```
+POST /v1/suggestions
+Content-Type: application/json
+
+{"library_identifier": "<32 hex>", "item": "<32 hex>", "version": 1, "question": 1, "answers": ["goed"]}
+```
+
+- `version` is the version the family uses; `question` the question's place in its `content.questions`, from 1, as in the review's reasons. The question must take answers (an `answers` array).
+- `answers` holds 1 to 10 answers, each trimmed, of 1 to 100 characters (Unicode scalar values) and without control characters. An answer the question already accepts is left out.
+- The answer is `204 No Content`, with no body and no cookie. Suggesting the same answer again changes nothing: each identifier counts once per answer.
+- Only an item the identifier reported importing can receive suggestions; otherwise `403 {"error": "not_imported"}`.
+- Refusals: `400 {"error": "bad_suggestion"}` for the answers; `404 {"error": "unknown_version"}`; `400 {"error": "unknown_question"}`; `bad_library_identifier`, `bad_request` and `unknown_item` as for imports. Like every `POST` under `/v1/`, it is refused with a session.
+- The library keeps with the identifier only the item, the version, the question and the answers, never a time, an address or an account. Suggestions are not public: only the item's author reads them, counted.
+
+### For the author
+
+The website's account pages read, with the library account's session (`Cache-Control: private, no-store`):
+
+```
+GET /api/account/suggestions
+
+{"items": [{"item": "<32 hex>", "title": "Irregular verbs", "version": 2, "questions": [
+  {"question": 1, "prompt": "Past of 'go'", "answers": [{"answer": "goed", "families": 2}]}
+]}]}
+```
+
+- Only the account's items with suggestions are listed. Questions are numbered in the item's latest `version`; a suggestion for an earlier version follows its question there by its `prompt`, and is left out when no question of the latest version has that prompt. An answer the latest version accepts is no longer suggested.
+- `families` counts the distinct library identifiers that suggested the answer; the answers come most suggested first. No identifier is ever shown.
+
+The author accepts some of them into a new version:
+
+```
+POST /api/account/items/{item}/suggestions/accept
+Authorization: Bearer <session>
+
+{"accepted": [{"question": 1, "answers": ["goed"]}]}
+```
+
+- The answer is `200 {"prepared": {...}}`: the latest version with the accepted answers added to their questions, as the body of the share route (`item`, `type`, `title`, `metadata`, `content`, `media` in base64), which the website then sends to `POST /api/shares` with the same session. The new version goes through the review like any share, counts in the quota, and the accepted answers leave the suggestions once it is published.
+- Refusals: an item that is not one of the account's `404 {"error": "unknown_item"}`; no answer accepted `400 {"error": "bad_suggestion"}`; an answer that is not among the question's suggestions `409 {"error": "not_suggested"}`; signed out `401 signed_out`.
+- The share route takes the prepared body once it shares new versions of an account's own items (`item`, ticket 14, issue #15).
 ## Reports
 
 A family server reports a shared item for a parent, under its library identifier:

@@ -224,5 +224,20 @@
 	"told_appealed": "Your appeal was received. Another moderator will decide it.",
 	"refused_statement_required_appeal": "Please say why the decision should change.",
 	"refused_already_appealed": "You have already appealed this decision.",
-	"refused_too_late": "More than six months have passed since the decision: it can no longer be appealed."
+	"refused_too_late": "More than six months have passed since the decision: it can no longer be appealed.",
+	"suggestions_link": "Suggestions from families",
+	"suggestions_title": "Suggestions from families",
+	"suggestions_why": "Families that use your items may suggest other answers to accept for a question. You see how many families suggested each answer, never which ones. Tick those to accept: a new version goes to the review like any share.",
+	"suggestions_none": "No suggestions for your items yet.",
+	"suggestions_version": "Questions as in version {version}",
+	"suggestions_question": "Question {question}",
+	"suggestions_families": "Suggested by {count} families",
+	"suggestions_submit": "Share a new version with these answers",
+	"suggestions_published": "Version {version} is published with the answers you accepted.",
+	"suggestions_held": "The new version is held for a moderator, who will publish or refuse it.",
+	"suggestions_refused": "The review refused the new version: see Sharing for its reasons.",
+	"refused_answers_required": "Please tick at least one answer to accept.",
+	"refused_not_suggested": "These answers are no longer suggested: the page was out of date.",
+	"refused_sharing_terms_required": "Please accept the sharing terms first, on the Sharing page.",
+	"refused_share_quota_reached": "You have shared as many items as you may today: please try again tomorrow."
 }

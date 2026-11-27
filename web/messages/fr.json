@@ -224,5 +224,20 @@
 	"told_appealed": "Votre recours a été reçu. Un autre modérateur le tranchera.",
 	"refused_statement_required_appeal": "Dites pourquoi la décision devrait changer.",
 	"refused_already_appealed": "Vous avez déjà contesté cette décision.",
-	"refused_too_late": "Plus de six mois ont passé depuis la décision : elle ne peut plus être contestée."
+	"refused_too_late": "Plus de six mois ont passé depuis la décision : elle ne peut plus être contestée.",
+	"suggestions_link": "Suggestions des familles",
+	"suggestions_title": "Suggestions des familles",
+	"suggestions_why": "Les familles qui utilisent vos éléments peuvent suggérer d'autres réponses à accepter pour une question. Vous voyez combien de familles ont suggéré chaque réponse, jamais lesquelles. Cochez celles à accepter : une nouvelle version passe à l'examen comme tout partage.",
+	"suggestions_none": "Aucune suggestion pour vos éléments pour le moment.",
+	"suggestions_version": "Questions telles que dans la version {version}",
+	"suggestions_question": "Question {question}",
+	"suggestions_families": "Suggérée par {count} familles",
+	"suggestions_submit": "Partager une nouvelle version avec ces réponses",
+	"suggestions_published": "La version {version} est publiée avec les réponses acceptées.",
+	"suggestions_held": "La nouvelle version est retenue pour un modérateur, qui la publiera ou la refusera.",
+	"suggestions_refused": "L'examen a refusé la nouvelle version : voyez Partage pour ses raisons.",
+	"refused_answers_required": "Cochez au moins une réponse à accepter.",
+	"refused_not_suggested": "Ces réponses ne sont plus suggérées : la page n'était plus à jour.",
+	"refused_sharing_terms_required": "Acceptez d'abord les conditions de partage, sur la page Partage.",
+	"refused_share_quota_reached": "Vous avez partagé autant d'éléments que permis aujourd'hui : réessayez demain."
 }
