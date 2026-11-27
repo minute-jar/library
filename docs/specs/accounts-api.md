@@ -31,7 +31,7 @@ The session lasts 30 days. It travels as `Authorization: Bearer <session>` on ev
 
 ### Strong and recent
 
-The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening and closing a library account need a recent strong sign-in; sharing (ticket 12) and linking a subscription will too.
+The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening and closing a library account, and verifying its card, need a recent strong sign-in; sharing (ticket 12) and linking a subscription will too.
 
 ## Session
 
@@ -67,6 +67,27 @@ An account, as its owner sees it:
 - Its pseudonym stays reserved: no account may take it again, without regard to case.
 - The library account is no longer joined to the Minute Jar account, whose next sign-in finds no account and may open another, under another pseudonym.
 - Its identification data is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Sharing (ticket 12) records the last share in `identifications.last_shared_at`.
+
+## Card
+
+A library account needs a verified payment card before its first share (ADR-0001), verified through the subscription's payment provider (ADR-0007, behind the `CardVerifier` and `SubscriptionCards` interfaces; fakes in tests). The card number never reaches the library: it keeps the provider's reference and the card's fingerprint, as identification data (table `identification_cards`, beside `identifications`), answered by no route. The same card may serve several library accounts; the operator sees which (`Library::accounts_sharing_card`).
+
+A card, as its owner sees it:
+
+```json
+{"verified_by": "subscription", "verified_at": "2026-11-27T10:00:00Z"}
+```
+
+`verified_by` is `subscription` (the card of the subscription of the same Minute Jar account, story S7) or `check` (a zero-amount check with 3-D Secure, story S8).
+
+- `POST /api/account/card` (no body) verifies the card. When the account is on `same_as_subscription` and that Minute Jar account pays a subscription with a card, that card is used: `200` `{"card": <card>}`. Otherwise a zero-amount check starts: `202` `{"check_url": "https://..."}`; the website sends the browser there, and the provider sends it back to the website's card page (`/account/card`). Starting again replaces a check left unfinished. Refusals, in this order:
+  - `403` `strong_sign_in_required`: as for opening;
+  - `404` `no_account`;
+  - `409` `card_verified`: the account's card is already verified.
+- `POST /api/account/card/check` (no body), once the browser is back, reads the check's result: `200` `{"card": <card>}` (also when the card was already verified). Refusals: `404` `no_card_check` (none started, or the last one was refused); `409` `card_check_pending` (not finished at the provider yet); `400` `card_refused` (the bank or the person refused it; it can be started again).
+- `GET /api/account/card` answers the card, or `404` `no_card` (or `no_account`).
+
+Until the service is given a card verifier (`Library::with_cards`), these routes answer `503` `{"error": "unavailable"}`, as when the provider cannot be reached.
 
 A body that is not exactly the expected object (an unknown field, a library identifier among them) answers `400` `{"error": "bad_request"}`.
 

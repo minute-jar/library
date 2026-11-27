@@ -93,5 +93,17 @@
 	"close_understood": "I understand that my shared items stay published with my pseudonym.",
 	"close_submit": "Close my library account",
 	"closed": "Your library account is closed. Your shared items stay published under your pseudonym.",
-	"refused_confirmation_required": "Please confirm that you understand what closing your account does."
+	"refused_confirmation_required": "Please confirm that you understand what closing your account does.",
+	"card_link": "Your card",
+	"card_title": "Your card",
+	"card_why": "To share, a library account needs a verified card: it relies on your bank's check, so that someone answers for what is shared. The library never sees the card number and never shows your card.",
+	"card_subscription": "Your subscription's card is used if it has one: you do not enter it again.",
+	"card_check": "Otherwise, a zero-amount check: you enter a card at the payment provider, and your bank may ask you to confirm. Nothing is charged.",
+	"card_submit": "Verify my card",
+	"card_verified_subscription": "Your card is verified, by your subscription's card, on {date}.",
+	"card_verified_check": "Your card is verified, by a zero-amount check, on {date}.",
+	"card_pending": "The check is not finished. Verify your card again to start a new one.",
+	"card_refused": "Your bank or the payment provider refused the check. You can try again, with another card if needed.",
+	"card_sign_in_strong": "To verify a card, sign in again with a passkey, Google, Apple, Microsoft, or a password with a code from your authenticator app.",
+	"refused_card_verified": "Your card is already verified."
 }
