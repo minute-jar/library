@@ -202,3 +202,32 @@ pub fn fractions() -> NewVersion {
         content: json!({"questions": []}),
     }
 }
+
+/// Two library identifiers, as two family servers draw them.
+pub const FAMILY_A: &str = "aaaaaaaaaaaaaaaa0000000000000001";
+pub const FAMILY_B: &str = "bbbbbbbbbbbbbbbb0000000000000002";
+
+pub async fn post_json(library: &Library, path: &str, body: &Value) -> Answer {
+    post_bytes(library, path, body.to_string().into_bytes()).await
+}
+
+pub async fn post_bytes(library: &Library, path: &str, body: Vec<u8>) -> Answer {
+    get_with(
+        library,
+        Request::post(path)
+            .header("content-type", "application/json")
+            .body(Body::from(body))
+            .unwrap(),
+    )
+    .await
+}
+
+/// Reports an import of `item` under `identifier`, as a family server does.
+pub async fn import(library: &Library, identifier: &str, item: &str) -> Answer {
+    post_json(
+        library,
+        "/v1/imports",
+        &json!({"library_identifier": identifier, "item": item}),
+    )
+    .await
+}
