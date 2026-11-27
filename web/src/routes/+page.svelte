@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { getLocale } from '#lib/paraglide/runtime.js';
+	import type { Path } from '$app/types';
+	import { resolve } from '$app/paths';
+	import { getLocale, localizeHref } from '#lib/paraglide/runtime.js';
 	import { m } from '#lib/paraglide/messages.js';
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
@@ -99,7 +101,16 @@
 				<li>
 					<Card.Root lang={entry.metadata.language} class="h-full">
 						<Card.Header>
-							<Card.Title><h2>{entry.title}</h2></Card.Title>
+							<Card.Title>
+								<h2>
+									<a
+										href={resolve(localizeHref(`/items/${entry.item}`) as Path)}
+										class="underline-offset-4 hover:underline"
+									>
+										{entry.title}
+									</a>
+								</h2>
+							</Card.Title>
 							<Card.Description lang={getLocale()}>
 								{entry.type === 'bank' ? m.type_bank() : m.type_path()} ·
 								{m.by_author({ pseudonym: entry.author.pseudonym })}

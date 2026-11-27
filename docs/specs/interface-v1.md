@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index, shared items and their media, the withdrawal list, imports and ratings. Reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports and ratings. Reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
 
 ## Signed documents
 
@@ -141,6 +141,33 @@ Pictures and sounds are not signed one by one (ADR-0004): a signed shared item l
 - a file that is none of the types above, recognised by its first bytes.
 
 A family server keeps a file only if its SHA-256 is the digest it asked for.
+
+## Item files
+
+A parent can download a shared item at one version as a file, from the website, so that a family server without Internet access can import it. The file is not signed itself: it carries the signed documents as the library serves them, byte for byte, and the item's media.
+
+```
+GET /api/items/{item}/versions/{version}/file
+Content-Disposition: attachment; filename="minute-jar-<item>-<version>.json"
+
+{"contract":1,"kind":"item_file","keys":<keys document>,"item":<signed shared item>,"media":[{"digest":"<64 hex>","base64":"<the file's bytes>"}]}
+```
+
+| Field | Meaning |
+|---|---|
+| `contract` | `1` for this version. |
+| `kind` | `item_file`. |
+| `keys` | The keys document (see Keys), the exact bytes `GET /.well-known/minute-jar-library.json` answered when the file was made. |
+| `item` | The signed shared item at that version, the exact bytes `GET /v1/items/{item}/versions/{version}` answers. |
+| `media` | One entry per medium the item lists, in its order: `digest`, and the file's bytes in `base64` (RFC 4648, with padding). `[]` when there are none. |
+
+The library writes the file as one line, the two signed documents spliced in unchanged, so that the file holds each of them byte for byte. A family server reads it as JSON; since a signature covers only a payload's exact text (see Signed documents), the documents it reads out check as they would have online. It imports the item only if:
+
+- the keys document is signed by the root key it trusts and lists the item's `key`, and the item's `issued_at` is not after that key's `not_after`. The keys document's own `expires_at` is not checked here: a file may be imported long after it was downloaded, and the root key, kept offline, vouches for the signing key;
+- the item is a valid signed shared item of contract `1`;
+- every listed medium is in `media`, and the SHA-256 of its bytes is its digest.
+
+A file cannot say whether the item was withdrawn since: a family server checks the withdrawal list the next time it reaches the library, as for any imported item. The library makes files only of versions the catalogue shows: a withdrawn item answers `404` with `{"error": "unknown_item"}`, a withdrawn or unknown version `404` with `{"error": "unknown_version"}`. A file is served with `Cache-Control: public, max-age=3600`, as long as the keys document it holds.
 
 ## Withdrawals
 
