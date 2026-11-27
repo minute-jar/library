@@ -67,6 +67,13 @@ impl IdToken {
                 .iter()
                 .any(|method| matches!(method.as_str(), "passkey" | "webauthn" | "oidc"))
     }
+
+    /// A passkey, which moderators must use (ADR-0006).
+    pub fn is_passkey(&self) -> bool {
+        self.amr
+            .iter()
+            .any(|method| matches!(method.as_str(), "passkey" | "webauthn"))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,6 +198,7 @@ pub(crate) async fn finish(
         return Err(SignInError::BadSignIn);
     }
     let strong = token.is_strong();
+    let passkey = token.is_passkey();
     let has_account = account_of(pool, &token.subject).await?.is_some();
     // The e-mail serves only to open a library account, which needs a
     // recent strong sign-in.
@@ -198,12 +206,13 @@ pub(crate) async fn finish(
     let session = random_token();
     let expires_at = now.checked_add(SESSION_LIFETIME).expect("a session's end");
     sqlx::query(
-        "INSERT INTO sessions (token_digest, subject, strong, auth_time, email, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6)",
+        "INSERT INTO sessions (token_digest, subject, strong, passkey, auth_time, email, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)",
     )
     .bind(digest(&session))
     .bind(&token.subject)
     .bind(strong)
+    .bind(passkey)
     .bind(token.auth_time.map(sqlx_time))
     .bind(email)
     .bind(sqlx_time(expires_at))
@@ -222,12 +231,19 @@ pub(crate) struct Session {
     pub subject: String,
     /// Until when the sign-in counts as recent and strong, if it was strong.
     pub strong_until: Option<Timestamp>,
+    /// Whether the sign-in used a passkey.
+    pub passkey: bool,
     pub email: Option<String>,
 }
 
 impl Session {
     pub fn recently_strong(&self, now: Timestamp) -> bool {
         self.strong_until.is_some_and(|until| now <= until)
+    }
+
+    /// A recent sign-in with a passkey, as moderating needs.
+    pub fn recently_passkey(&self, now: Timestamp) -> bool {
+        self.passkey && self.recently_strong(now)
     }
 }
 
@@ -237,24 +253,28 @@ pub(crate) async fn session(
     token: &str,
     now: Timestamp,
 ) -> Result<Option<Session>, sqlx::Error> {
-    let row: Option<(String, bool, Option<SqlTime>, Option<String>)> = sqlx::query_as(
-        "SELECT subject, strong, auth_time, email FROM sessions
+    type Row = (String, bool, bool, Option<SqlTime>, Option<String>);
+    let row: Option<Row> = sqlx::query_as(
+        "SELECT subject, strong, passkey, auth_time, email FROM sessions
          WHERE token_digest = $1 AND expires_at > $2",
     )
     .bind(digest(token))
     .bind(sqlx_time(now))
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(|(subject, strong, auth_time, email)| Session {
-        digest: digest(token),
-        subject,
-        strong_until: auth_time.filter(|_| strong).map(|time| {
-            from_sqlx(time)
-                .checked_add(RECENT)
-                .expect("a recent sign-in's end")
+    Ok(
+        row.map(|(subject, strong, passkey, auth_time, email)| Session {
+            digest: digest(token),
+            subject,
+            strong_until: auth_time.filter(|_| strong).map(|time| {
+                from_sqlx(time)
+                    .checked_add(RECENT)
+                    .expect("a recent sign-in's end")
+            }),
+            passkey,
+            email,
         }),
-        email,
-    }))
+    )
 }
 
 /// Ends a session.

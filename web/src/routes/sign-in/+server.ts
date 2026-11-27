@@ -1,6 +1,8 @@
 // Starts a sign-in with a Minute Jar account: the browser goes to the
 // identity provider, with the state kept in a cookie to check when it comes
-// back. `?strong` asks for a new strong sign-in (accounts-api.md).
+// back. `?strong` asks for a new strong sign-in (accounts-api.md);
+// `?return=moderation` comes back to the moderation queue instead of the
+// account page, and no other place is accepted.
 
 import { error, redirect } from '@sveltejs/kit';
 import { getLocale } from '#lib/paraglide/runtime.js';
@@ -14,7 +16,8 @@ export const GET: RequestHandler = async ({ url, fetch, cookies }) => {
 	} catch {
 		error(503, 'Sign-in is unavailable');
 	}
-	cookies.set(SIGN_IN_COOKIE, `${started.state}.${getLocale()}`, {
+	const back = url.searchParams.get('return') === 'moderation' ? '.moderation' : '';
+	cookies.set(SIGN_IN_COOKIE, `${started.state}.${getLocale()}${back}`, {
 		httpOnly: true,
 		sameSite: 'lax',
 		path: '/',

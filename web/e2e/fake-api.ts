@@ -1,14 +1,18 @@
-// The catalogue and accounts APIs' answers for the smoke tests, on
+// The catalogue, accounts and moderation APIs' answers for the smoke tests, on
 // 127.0.0.1:4174, and a fake identity provider at `/authorize` that signs in
 // at once and sends the browser back to the website's callback page.
 
 import { createServer } from 'node:http';
 import { fakeApi } from '../src/lib/server/testing/fake-api.ts';
 import { fakeAccounts } from '../src/lib/server/testing/fake-accounts.ts';
+import { fakeModeration } from '../src/lib/server/testing/fake-moderation.ts';
 
 const root = 'http://127.0.0.1:4174';
 const api = fakeApi();
 const accounts = fakeAccounts(root);
+const moderation = fakeModeration(accounts);
+// Whoever signs in moderates: the operator's naming is the service's concern.
+moderation.anyoneModerates = true;
 
 createServer((request, response) => {
 	const url = new URL(request.url ?? '/', root);
@@ -29,9 +33,11 @@ createServer((request, response) => {
 			headers: request.headers as Record<string, string>,
 			body
 		});
-		void (accounts.fetch(asked) ?? api.fetch(asked)).then(async (answer) => {
-			response.writeHead(answer.status, Object.fromEntries(answer.headers));
-			response.end(await answer.text());
-		});
+		void (moderation.fetch(asked) ?? accounts.fetch(asked) ?? api.fetch(asked)).then(
+			async (answer) => {
+				response.writeHead(answer.status, Object.fromEntries(answer.headers));
+				response.end(await answer.text());
+			}
+		);
 	});
 }).listen(4174, '127.0.0.1');

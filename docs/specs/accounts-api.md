@@ -31,7 +31,7 @@ The session lasts 30 days. It travels as `Authorization: Bearer <session>` on ev
 
 ### Strong and recent
 
-The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening a library account needs a recent strong sign-in; sharing (ticket 12) and linking a subscription will too.
+The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening a library account needs a recent strong sign-in; sharing (ticket 12) and linking a subscription will too. Moderating needs more: a recent sign-in with a passkey (`amr` holding `passkey` or `webauthn`), which the session records (`moderation-api.md`).
 
 ## Session
 

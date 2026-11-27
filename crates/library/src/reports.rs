@@ -24,6 +24,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use crate::catalogue::{is_item_id, sign_index};
 use crate::contract::SigningKey;
 use crate::imports::is_library_identifier;
+use crate::moderation::{AppealDecision, AppealOutcome};
 use crate::review::{ReviewOutcome, Reviewer, Submission};
 use crate::withdrawals::{self, Reason, Withdrawal};
 
@@ -148,7 +149,7 @@ pub enum Effect {
 }
 
 impl Effect {
-    fn code(self) -> &'static str {
+    pub(crate) fn code(self) -> &'static str {
         match self {
             Effect::None => "none",
             Effect::SwitchedOff => "switched_off",
@@ -156,7 +157,7 @@ impl Effect {
         }
     }
 
-    fn from_code(code: &str) -> Effect {
+    pub(crate) fn from_code(code: &str) -> Effect {
         match code {
             "switched_off" => Effect::SwitchedOff,
             "hidden" => Effect::Hidden,
@@ -196,6 +197,13 @@ pub enum DecideError {
     UnknownReport,
     /// The report was decided already, or closed by the author's correction.
     AlreadyDecided,
+    /// The reasons are empty.
+    ReasonsRequired,
+    /// The Minute Jar account deciding is not a moderator.
+    NotAModerator,
+    UnknownAppeal,
+    /// An appeal must be decided by another moderator than the decision.
+    SameModerator,
     Unavailable,
     Database(sqlx::Error),
 }
@@ -243,6 +251,8 @@ pub struct AuthorNotification {
     pub details: Option<String>,
     /// `None` for a report to answer, the decision otherwise.
     pub decision: Option<Decision>,
+    /// An appeal's decision, from the author or the reporter.
+    pub appeal: Option<AppealDecision>,
     pub at: Timestamp,
 }
 
@@ -266,6 +276,14 @@ pub enum Message {
         item: String,
         reason: Reason,
     },
+    /// Another moderator decided the reporter's appeal.
+    AppealDecision {
+        appeal: String,
+        report: String,
+        item: String,
+        reason: Reason,
+        decision: AppealDecision,
+    },
 }
 
 /// A future a [`Notifier`] answers.
@@ -284,7 +302,7 @@ pub struct Desk {
     pub clock: Box<dyn Fn() -> Timestamp + Send + Sync>,
 }
 
-fn is_contact(contact: &str) -> bool {
+pub(crate) fn is_contact(contact: &str) -> bool {
     let mut parts = contact.split('@');
     let (Some(local), Some(domain), None) = (parts.next(), parts.next(), parts.next()) else {
         return false;
@@ -386,7 +404,7 @@ async fn withdrawn_whole(
     Ok(withdrawn)
 }
 
-async fn lock(tx: &mut Transaction<'_, Postgres>) -> Result<(), sqlx::Error> {
+pub(crate) async fn lock(tx: &mut Transaction<'_, Postgres>) -> Result<(), sqlx::Error> {
     // One change of the catalogue at a time, so that documents follow it in order.
     sqlx::query("SELECT pg_advisory_xact_lock(1)")
         .execute(&mut **tx)
@@ -394,7 +412,7 @@ async fn lock(tx: &mut Transaction<'_, Postgres>) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-async fn sign_both(
+pub(crate) async fn sign_both(
     tx: &mut Transaction<'_, Postgres>,
     signing: &SigningKey,
     now: Timestamp,
@@ -586,21 +604,27 @@ async fn notify_author(
     Ok(())
 }
 
-/// Records a moderator's decision on a report at `now`, and acts on it.
-pub async fn decide(
-    pool: &PgPool,
+/// A decision recorded, not yet committed: what it was on, and the
+/// message to send the reporter once committed.
+pub(crate) struct Decided {
+    pub item: String,
+    pub reason: Reason,
+    pub message: Option<(String, Message)>,
+}
+
+/// Records a moderator's decision on a report at `now` within a change of
+/// the catalogue already open and locked, and acts on it.
+pub(crate) async fn decide_in(
+    tx: &mut Transaction<'_, Postgres>,
     signing: &SigningKey,
-    desk: &Desk,
     report: &str,
     decision: Decision,
     now: Timestamp,
-) -> Result<(), DecideError> {
-    let mut tx = pool.begin().await?;
-    lock(&mut tx).await?;
+) -> Result<Decided, DecideError> {
     let row: Option<(String, String, String, Option<String>)> =
         sqlx::query_as("SELECT item, reason, status, contact FROM reports WHERE id = $1")
             .bind(report)
-            .fetch_optional(&mut *tx)
+            .fetch_optional(&mut **tx)
             .await?;
     let (item, reason, status, contact) = row.ok_or(DecideError::UnknownReport)?;
     let reason = Reason::from_code(&reason).expect("a stored reason");
@@ -617,7 +641,7 @@ pub async fn decide(
     .bind(decision.outcome.code())
     .bind(now.as_second())
     .bind(&decision.reasons)
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
     sqlx::query(
         "INSERT INTO author_notifications (item, report, kind, created_at) VALUES ($1, $2, 'decision', $3)",
@@ -625,38 +649,42 @@ pub async fn decide(
     .bind(&item)
     .bind(report)
     .bind(now.as_second())
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
 
     let changed = match decision.outcome {
         Outcome::Upheld => {
-            withdrawals::insert(&mut tx, &item, None, Withdrawal::Moderation(reason), now).await?;
+            withdrawals::insert(tx, &item, None, Withdrawal::Moderation(reason), now).await?;
             true
         }
-        Outcome::Rejected => put_back(&mut tx, &item, reason).await?,
+        Outcome::Rejected => put_back(tx, &item, reason).await?,
     };
     if changed {
-        sign_both(&mut tx, signing, now).await?;
+        sign_both(tx, signing, now).await?;
     }
-    tx.commit().await?;
-
-    if let Some(contact) = contact {
-        let message = Message::Decision {
-            report: report.to_string(),
-            item,
-            reason,
-            decision,
-        };
-        let _ = desk.notifier.send(&contact, &message).await;
-    }
-    Ok(())
+    let message = contact.map(|contact| {
+        (
+            contact,
+            Message::Decision {
+                report: report.to_string(),
+                item: item.clone(),
+                reason,
+                decision,
+            },
+        )
+    });
+    Ok(Decided {
+        item,
+        reason,
+        message,
+    })
 }
 
 /// After a rejected report, ends what reports for its reason did to the
 /// item once none of them waits for a moderator: the switch-off and the
 /// hiding, and the count of families that reported it. Answers whether the
 /// catalogue changed.
-async fn put_back(
+pub(crate) async fn put_back(
     tx: &mut Transaction<'_, Postgres>,
     item: &str,
     reason: Reason,
@@ -856,10 +884,14 @@ pub async fn author_notifications(
         String,
         Option<String>,
         i64,
+        Option<String>,
+        Option<String>,
     );
     let rows: Vec<Row> = sqlx::query_as(
-        "SELECT n.report, n.kind, r.reason, r.details, r.status, r.decision_reasons, n.created_at
+        "SELECT n.report, n.kind, r.reason, r.details, r.status, r.decision_reasons, n.created_at,
+                d.outcome, d.reasons
          FROM author_notifications AS n JOIN reports AS r ON r.id = n.report
+         LEFT JOIN moderation_decisions AS d ON d.appeal = n.appeal
          WHERE n.item = $1 ORDER BY n.id",
     )
     .bind(item)
@@ -868,14 +900,22 @@ pub async fn author_notifications(
     Ok(rows
         .into_iter()
         .map(
-            |(report, kind, reason, details, status, reasons, at)| AuthorNotification {
-                report,
-                reason: Reason::from_code(&reason).expect("a stored reason"),
-                details,
-                decision: (kind == "decision")
-                    .then(|| decision(ReportStatus::from_code(&status), reasons))
-                    .flatten(),
-                at: instant(at),
+            |(report, kind, reason, details, status, reasons, at, appealed, appeal_reasons)| {
+                AuthorNotification {
+                    report,
+                    reason: Reason::from_code(&reason).expect("a stored reason"),
+                    details,
+                    decision: (kind == "decision")
+                        .then(|| decision(ReportStatus::from_code(&status), reasons))
+                        .flatten(),
+                    appeal: appealed
+                        .zip(appeal_reasons)
+                        .map(|(outcome, reasons)| AppealDecision {
+                            outcome: AppealOutcome::from_code(&outcome),
+                            reasons,
+                        }),
+                    at: instant(at),
+                }
             },
         )
         .collect())

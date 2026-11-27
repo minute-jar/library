@@ -14,6 +14,11 @@
 //! Sign-in with a Minute Jar account stays off (its routes answer
 //! `unavailable`) until the identity service's adapter is wired, with the
 //! identity service of `minute-jar/hosting` (ADR-0006).
+//!
+//! The operator names moderators from the command line, never through a
+//! route: `library grant-moderator <subject> <handle>` makes the Minute Jar
+//! account `subject` a moderator known to other moderators as `handle`, and
+//! `library revoke-moderator <subject>` ends it.
 
 use std::time::Duration;
 
@@ -45,6 +50,40 @@ async fn main() {
     )
     .await
     .expect("the database is brought up to date");
+
+    let arguments: Vec<String> = std::env::args().skip(1).collect();
+    match arguments.iter().map(String::as_str).collect::<Vec<_>>()[..] {
+        [] => {}
+        ["grant-moderator", subject, handle] => {
+            library
+                .grant_moderator(subject, handle, Timestamp::now())
+                .await
+                .unwrap_or_else(|error| panic!("the moderator could not be named: {error:?}"));
+            println!("{handle} is a moderator");
+            return;
+        }
+        ["revoke-moderator", subject] => {
+            let revoked = library
+                .revoke_moderator(subject)
+                .await
+                .expect("the database is reachable");
+            println!(
+                "{}",
+                if revoked {
+                    "no longer a moderator"
+                } else {
+                    "was not a moderator"
+                }
+            );
+            return;
+        }
+        _ => {
+            eprintln!(
+                "usage: library [grant-moderator <subject> <handle> | revoke-moderator <subject>]"
+            );
+            std::process::exit(2);
+        }
+    }
 
     // The index lives three days and the withdrawal list one; sign them again well before.
     let refreshing = library.clone();
