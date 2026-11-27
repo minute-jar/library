@@ -5,6 +5,7 @@
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::Duration;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
@@ -15,8 +16,8 @@ use library::{Author, Curriculum, Library, LocalDirectory, Metadata, NewVersion}
 use serde_json::{Value, json};
 use sqlx::postgres::PgPoolOptions;
 use testcontainers_modules::postgres::Postgres;
-use testcontainers_modules::testcontainers::Container;
 use testcontainers_modules::testcontainers::runners::SyncRunner;
+use testcontainers_modules::testcontainers::{Container, ImageExt};
 use tower::ServiceExt;
 
 pub fn at(text: &str) -> Timestamp {
@@ -53,7 +54,9 @@ fn server_url() -> String {
     let (_, url) = CONTAINER.get_or_init(|| {
         // The blocking runner keeps its own runtime, so it starts outside the test's.
         std::thread::spawn(|| {
+            // A busy Docker can take well over the default minute to start it.
             let container = Postgres::default()
+                .with_startup_timeout(Duration::from_secs(180))
                 .start()
                 .expect("Docker runs a PostgreSQL for the tests");
             let port = container.get_host_port_ipv4(5432).unwrap();
