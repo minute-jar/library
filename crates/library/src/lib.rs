@@ -8,6 +8,7 @@
 pub mod contract;
 
 mod accounts;
+mod authors_withdrawal;
 mod bank_format;
 mod browse;
 mod cards;
@@ -538,6 +539,7 @@ impl Library {
             .merge(cards::http::router(self.clone()))
             .merge(shares::http::router(self.clone()))
             .merge(comments::http::router(self.clone()))
+            .merge(authors_withdrawal::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,
             ))

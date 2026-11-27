@@ -143,6 +143,10 @@ pub async fn withdraw(
 
 /// Writes a withdrawal within a change of the catalogue already open, once
 /// the item or version is known; the caller signs the documents again.
+///
+/// An author's withdrawal is final: it replaces any other withdrawal of the
+/// same item or version, and none replaces it, so that no reactivation,
+/// moderation decision or appeal brings back what its author withdrew.
 pub(crate) async fn insert(
     tx: &mut Transaction<'_, Postgres>,
     item: &str,
@@ -154,7 +158,8 @@ pub(crate) async fn insert(
     sqlx::query(
         "INSERT INTO withdrawals (item, version, kind, reason, withdrawn_at) VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (item, version) DO UPDATE
-         SET kind = EXCLUDED.kind, reason = EXCLUDED.reason, withdrawn_at = EXCLUDED.withdrawn_at",
+         SET kind = EXCLUDED.kind, reason = EXCLUDED.reason, withdrawn_at = EXCLUDED.withdrawn_at
+         WHERE withdrawals.kind <> 'author'",
     )
     .bind(item)
     .bind(stored(version))

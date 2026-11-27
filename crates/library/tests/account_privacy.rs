@@ -108,6 +108,12 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             "/api/moderation/comment-reports/00000000000000000000000000000000/decision".into(),
             Some(json!({"outcome": "rejected", "reasons": "Fine."})),
         ),
+        ("GET", "/api/account/items".into(), None),
+        (
+            "POST",
+            format!("/api/account/items/{VERBS}/withdrawal"),
+            Some(json!({"version": null})),
+        ),
         ("GET", "/api/moderation/queue".into(), None),
         ("GET", format!("/api/moderation/items/{VERBS}"), None),
         ("GET", "/api/moderation/figures/2026".into(), None),
