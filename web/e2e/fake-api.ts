@@ -1,4 +1,4 @@
-// The catalogue, accounts, sharing and moderation APIs' answers for the smoke tests, on
+// The catalogue, accounts, sharing, author's items and moderation APIs' answers for the smoke tests, on
 // 127.0.0.1:4174, a fake identity provider at `/authorize` that signs in
 // at once and sends the browser back to the website's callback page, and a
 // fake payment provider at `/setup/<check>` that verifies the card at once
@@ -11,8 +11,19 @@ import { fakeCards } from '../src/lib/server/testing/fake-cards.ts';
 import { fakeShares } from '../src/lib/server/testing/fake-shares.ts';
 import { fakeModeration } from '../src/lib/server/testing/fake-moderation.ts';
 import { fakeSuggestions } from '../src/lib/server/testing/fake-suggestions.ts';
+import { fakeAuthored } from '../src/lib/server/testing/fake-authored.ts';
+import type { AuthoredItem } from '../src/lib/server/authored.ts';
 
 const root = 'http://127.0.0.1:4174';
+const verbsOfTheAuthor: AuthoredItem = {
+	item: '0123456789abcdef0123456789abcdef',
+	title: 'Irregular verbs, part 2',
+	withdrawal: null,
+	versions: [
+		{ version: 2, published_at: '2026-11-27T10:05:00Z', withdrawal: null },
+		{ version: 1, published_at: '2026-11-27T10:00:00Z', withdrawal: null }
+	]
+};
 const api = fakeApi();
 const accounts = fakeAccounts(root);
 const cards = fakeCards(accounts, root);
@@ -37,6 +48,9 @@ suggestions.anyone = [
 		]
 	}
 ];
+const authored = fakeAuthored(accounts);
+// Whoever opens an account has published one item.
+authored.everyone = [verbsOfTheAuthor];
 // Whoever signs in moderates: the operator's naming is the service's concern.
 moderation.anyoneModerates = true;
 
@@ -68,6 +82,7 @@ createServer((request, response) => {
 		void (
 			suggestions.fetch(asked) ??
 			shares.fetch(asked) ??
+			authored.fetch(asked) ??
 			cards.fetch(asked) ??
 			moderation.fetch(asked) ??
 			accounts.fetch(asked) ??
