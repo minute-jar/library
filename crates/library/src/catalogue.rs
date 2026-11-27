@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Transaction};
 
 use crate::contract::{Kind, SigningKey};
+use crate::media::{self, MediaStore};
 use crate::{Metadata, NewVersion};
 
 /// Why a version could not be published.
@@ -14,6 +15,17 @@ use crate::{Metadata, NewVersion};
 pub enum PublishError {
     /// The item identifier is not 32 lowercase hexadecimal digits.
     BadItem,
+    /// A picture or sound weighs more than [`crate::MEDIUM_LIMIT`].
+    MediumTooLarge {
+        digest: String,
+    },
+    /// The media of the version weigh more than [`crate::ITEM_MEDIA_LIMIT`] together.
+    MediaTooLarge,
+    /// A file that is no picture or sound of the bank format.
+    UnsupportedMedium {
+        digest: String,
+    },
+    Storage(std::io::Error),
     Database(sqlx::Error),
 }
 
@@ -49,12 +61,15 @@ fn metadata_json(metadata: &Metadata) -> Value {
 pub async fn publish(
     pool: &PgPool,
     signing: &SigningKey,
-    new: NewVersion,
+    media_store: &dyn MediaStore,
+    mut new: NewVersion,
     now: Timestamp,
 ) -> Result<u32, PublishError> {
     if !is_item_id(&new.item) {
         return Err(PublishError::BadItem);
     }
+    let media = media::prepare(std::mem::take(&mut new.media))?;
+    media::keep(media_store, &media).await?;
     let mut tx = pool.begin().await?;
     // One change of the catalogue at a time, so that documents follow it in order.
     sqlx::query("SELECT pg_advisory_xact_lock(1)")
@@ -84,6 +99,7 @@ pub async fn publish(
     .bind(now.as_second())
     .execute(&mut *tx)
     .await?;
+    media::record(&mut tx, &media).await?;
 
     let item = signing.sign(
         Kind::Item,
@@ -100,7 +116,7 @@ pub async fn publish(
             "metadata": metadata,
             "published_at": crate::contract::time(now),
             "content": new.content,
-            "media": [],
+            "media": media::listing(&media),
         }),
     );
     store(&mut tx, &item_path(&new.item, version), &item).await?;
@@ -114,7 +130,7 @@ const INDEX_LIFETIME: jiff::SignedDuration = jiff::SignedDuration::from_hours(72
 
 pub const INDEX_PATH: &str = "/v1/index";
 
-/// Signs the index again at `now`, as the catalogue stands.
+/// Signs the index and the withdrawal list again at `now`, as the catalogue stands.
 pub async fn refresh(
     pool: &PgPool,
     signing: &SigningKey,
@@ -125,10 +141,11 @@ pub async fn refresh(
         .execute(&mut *tx)
         .await?;
     sign_index(&mut tx, signing, now).await?;
+    crate::withdrawals::sign(&mut tx, signing, now).await?;
     tx.commit().await
 }
 
-async fn sign_index(
+pub(crate) async fn sign_index(
     tx: &mut Transaction<'_, Postgres>,
     signing: &SigningKey,
     now: Timestamp,
@@ -148,10 +165,12 @@ async fn sign_index(
     );
     let latest: Vec<Row> = sqlx::query_as(
         "SELECT DISTINCT ON (item) item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at,
-                (SELECT count(*) FROM imports WHERE imports.item = item_versions.item),
-                ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = item_versions.item AND ratings.stars = s)
+                (SELECT count(*) FROM imports WHERE imports.item = v.item),
+                ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = v.item AND ratings.stars = s)
                       FROM generate_series(1, 5) AS s ORDER BY s)
-         FROM item_versions ORDER BY item, version DESC",
+         FROM item_versions AS v
+         WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+         ORDER BY item, version DESC",
     )
     .fetch_all(&mut **tx)
     .await?;
@@ -180,7 +199,7 @@ async fn sign_index(
     store(tx, INDEX_PATH, &index).await
 }
 
-async fn store(
+pub(crate) async fn store(
     tx: &mut Transaction<'_, Postgres>,
     path: &str,
     body: &str,

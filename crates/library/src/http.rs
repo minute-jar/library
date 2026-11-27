@@ -13,20 +13,26 @@ use axum::routing::{get, post};
 use serde::Deserialize;
 
 use crate::catalogue::{self, Stored, item_path};
+use crate::media;
 use crate::{ImportError, Library, RatingError};
 
 const KEYS_CACHE: &str = "public, max-age=3600";
 const INDEX_CACHE: &str = "public, max-age=300";
 const ITEM_CACHE: &str = "public, max-age=86400";
+/// A medium never changes: its address is its digest.
+const MEDIA_CACHE: &str = "public, max-age=31536000, immutable";
+const WITHDRAWALS_CACHE: &str = "public, max-age=300";
 
 pub fn router(library: Library) -> Router {
     Router::new()
         .route("/.well-known/minute-jar-library.json", get(keys))
         .route("/v1/index", get(index))
         .route("/v1/items/{item}/versions/{version}", get(item_version))
+        .route("/v1/withdrawals", get(withdrawals))
         .route("/v1/imports", post(import))
         .route("/v1/ratings", post(rate))
         .route("/api/items/{item}/ratings", get(item_ratings))
+        .route("/v1/media/{digest}", get(medium))
         .with_state(library)
 }
 
@@ -37,6 +43,13 @@ async fn keys(State(library): State<Library>, request: HeaderMap) -> Response {
 async fn index(State(library): State<Library>, request: HeaderMap) -> Response {
     match catalogue::document(&library.pool, catalogue::INDEX_PATH).await {
         Ok(Some(stored)) => served(&stored, INDEX_CACHE, &request),
+        _ => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    }
+}
+
+async fn withdrawals(State(library): State<Library>, request: HeaderMap) -> Response {
+    match catalogue::document(&library.pool, crate::withdrawals::PATH).await {
+        Ok(Some(stored)) => served(&stored, WITHDRAWALS_CACHE, &request),
         _ => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
 }
@@ -145,19 +158,51 @@ fn rating_refused(error: RatingError) -> Response {
     }
 }
 
+async fn medium(
+    State(library): State<Library>,
+    Path(digest): Path<String>,
+    request: HeaderMap,
+) -> Response {
+    if !media::is_digest(&digest) {
+        return refused(StatusCode::NOT_FOUND, "unknown_media");
+    }
+    let media_type = match media::published_type(&library.pool, &digest).await {
+        Ok(Some(media_type)) => media_type,
+        Ok(None) => return refused(StatusCode::NOT_FOUND, "unknown_media"),
+        Err(_) => return refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    };
+    let headers = [
+        (header::CONTENT_TYPE, media_type),
+        (header::CACHE_CONTROL, MEDIA_CACHE.to_string()),
+        (header::ETAG, format!("\"{digest}\"")),
+        (header::X_CONTENT_TYPE_OPTIONS, "nosniff".to_string()),
+    ];
+    if names(&request, &headers[2].1) {
+        return (StatusCode::NOT_MODIFIED, headers).into_response();
+    }
+    match library.media.get(&digest).await {
+        Ok(Some(bytes)) => (headers, bytes).into_response(),
+        _ => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    }
+}
+
+/// Whether the request's `If-None-Match` names `etag`.
+fn names(request: &HeaderMap, etag: &str) -> bool {
+    request
+        .get_all(header::IF_NONE_MATCH)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| value.split(','))
+        .any(|tag| tag.trim() == etag || tag.trim() == "*")
+}
+
 fn served(stored: &Stored, cache: &'static str, request: &HeaderMap) -> Response {
     let headers = [
         (header::CONTENT_TYPE, "application/json".to_string()),
         (header::CACHE_CONTROL, cache.to_string()),
         (header::ETAG, stored.etag.clone()),
     ];
-    let unchanged = request
-        .get_all(header::IF_NONE_MATCH)
-        .iter()
-        .filter_map(|value| value.to_str().ok())
-        .flat_map(|value| value.split(','))
-        .any(|tag| tag.trim() == stored.etag || tag.trim() == "*");
-    if unchanged {
+    if names(request, &stored.etag) {
         (StatusCode::NOT_MODIFIED, headers).into_response()
     } else {
         (headers, stored.body.clone()).into_response()
