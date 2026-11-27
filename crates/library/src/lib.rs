@@ -10,6 +10,10 @@ pub mod contract;
 mod browse;
 mod catalogue;
 mod http;
+mod imports;
+mod media;
+mod ratings;
+mod withdrawals;
 
 use std::sync::Arc;
 
@@ -21,6 +25,10 @@ use sqlx::PgPool;
 use crate::contract::SigningKey;
 
 pub use crate::catalogue::PublishError;
+pub use crate::imports::ImportError;
+pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
+pub use crate::ratings::{ItemRatings, REVIEW_LENGTH, RatingError, Review};
+pub use crate::withdrawals::{Reason, WithdrawError, Withdrawal};
 
 /// A question bank or a learning path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -86,6 +94,8 @@ pub struct NewVersion {
     pub metadata: Metadata,
     /// The bank or learning path, in the bank format.
     pub content: Value,
+    /// The files of its pictures and sounds, which `content` names by digest.
+    pub media: Vec<Vec<u8>>,
 }
 
 /// The library service.
@@ -94,16 +104,18 @@ pub struct Library {
     pool: PgPool,
     signing: Arc<SigningKey>,
     keys_document: Arc<catalogue::Stored>,
+    media: Arc<dyn MediaStore>,
 }
 
 impl Library {
     /// The service over its database, which it brings up to date, signing
-    /// with `signing`, which `keys_document` certifies; the index is signed
-    /// again at `now`.
+    /// with `signing`, which `keys_document` certifies, keeping media in
+    /// `media`; the index is signed again at `now`.
     pub async fn open(
         pool: PgPool,
         signing: SigningKey,
         keys_document: String,
+        media: impl MediaStore,
         now: Timestamp,
     ) -> Result<Self, sqlx::Error> {
         sqlx::migrate!().run(&pool).await?;
@@ -112,6 +124,7 @@ impl Library {
             pool,
             signing: Arc::new(signing),
             keys_document: Arc::new(catalogue::Stored::new(keys_document)),
+            media: Arc::new(media),
         })
     }
 
@@ -121,10 +134,64 @@ impl Library {
         version: NewVersion,
         now: Timestamp,
     ) -> Result<u32, PublishError> {
-        catalogue::publish(&self.pool, &self.signing, version, now).await
+        catalogue::publish(&self.pool, &self.signing, &*self.media, version, now).await
     }
 
-    /// Signs the index again at `now`, before it expires.
+    /// Records that the family server under `library_identifier` imported
+    /// the shared item `item`. The index counts each identifier once per item,
+    /// from the next time it is signed.
+    pub async fn record_import(
+        &self,
+        library_identifier: &str,
+        item: &str,
+    ) -> Result<(), ImportError> {
+        imports::record(&self.pool, library_identifier, item).await
+    }
+
+    /// Records the rating of `stars`, from 1 to 5, and the short review if
+    /// any, that the family server under `library_identifier` gives the
+    /// shared item `item`, which it must have imported. It replaces the
+    /// identifier's earlier rating of the item; the index counts it from the
+    /// next time it is signed, and the review shows once published.
+    pub async fn record_rating(
+        &self,
+        library_identifier: &str,
+        item: &str,
+        stars: u8,
+        review: Option<&str>,
+    ) -> Result<(), RatingError> {
+        ratings::record(&self.pool, library_identifier, item, stars, review).await
+    }
+
+    /// How the shared item `item` is rated now, with its published reviews.
+    pub async fn item_ratings(&self, item: &str) -> Result<ItemRatings, RatingError> {
+        ratings::of_item(&self.pool, item).await
+    }
+
+    /// Withdraws a shared item, or one of its versions when `version` is
+    /// given: it enters the withdrawal list and leaves the index.
+    pub async fn withdraw(
+        &self,
+        item: &str,
+        version: Option<u32>,
+        withdrawal: Withdrawal,
+        now: Timestamp,
+    ) -> Result<(), WithdrawError> {
+        withdrawals::withdraw(&self.pool, &self.signing, item, version, withdrawal, now).await
+    }
+
+    /// Ends a switch-off: the item or version leaves the withdrawal list and
+    /// comes back to the index.
+    pub async fn reactivate(
+        &self,
+        item: &str,
+        version: Option<u32>,
+        now: Timestamp,
+    ) -> Result<(), WithdrawError> {
+        withdrawals::reactivate(&self.pool, &self.signing, item, version, now).await
+    }
+
+    /// Signs the index and the withdrawal list again at `now`, before they expire.
     pub async fn refresh(&self, now: Timestamp) -> Result<(), sqlx::Error> {
         catalogue::refresh(&self.pool, &self.signing, now).await
     }

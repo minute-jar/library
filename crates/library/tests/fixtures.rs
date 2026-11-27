@@ -17,12 +17,13 @@ fn fixtures() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/v1")
 }
 
-fn check_or_write(name: &str, body: &str, mismatches: &mut Vec<String>) {
+fn check_or_write(name: &str, body: impl AsRef<[u8]>, mismatches: &mut Vec<String>) {
+    let body = body.as_ref();
     let path = fixtures().join(name);
     if std::env::var("UPDATE_FIXTURES").is_ok() {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, body).unwrap();
-    } else if std::fs::read_to_string(&path).ok().as_deref() != Some(body) {
+    } else if std::fs::read(&path).ok().as_deref() != Some(body) {
         mismatches.push(name.to_string());
     }
 }
@@ -38,8 +39,10 @@ async fn the_service_serves_the_fixtures_and_family_servers_refuse_the_refused_o
         .publish_version(fractions(), at("2026-11-21T08:00:00Z"))
         .await
         .unwrap();
+    let mut with_picture = verbs("Irregular verbs, part 1");
+    with_picture.media = vec![pixel()];
     library
-        .publish_version(verbs("Irregular verbs, part 1"), at("2026-11-26T09:00:00Z"))
+        .publish_version(with_picture, at("2026-11-26T09:00:00Z"))
         .await
         .unwrap();
     let mut mismatches = Vec::new();
@@ -62,14 +65,11 @@ async fn the_service_serves_the_fixtures_and_family_servers_refuse_the_refused_o
             &format!("items/{FRACTIONS}/1.json"),
             format!("/v1/items/{FRACTIONS}/versions/1"),
         ),
+        (&format!("media/{PIXEL}"), format!("/v1/media/{PIXEL}")),
     ];
     for (name, path) in &served {
         let answer = get(&library, path).await;
-        check_or_write(
-            &format!("served/{name}"),
-            std::str::from_utf8(&answer.body).unwrap(),
-            &mut mismatches,
-        );
+        check_or_write(&format!("served/{name}"), &answer.body, &mut mismatches);
     }
 
     let index = get(&library, "/v1/index").await.body;
