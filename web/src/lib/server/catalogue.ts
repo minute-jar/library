@@ -22,7 +22,7 @@ export type Entry = {
 		curriculum: Curriculum | null;
 	};
 	selection: boolean;
-	signals: { families: number };
+	signals: { families: number; /** How many ratings of 1 to 5 stars. */ ratings: number[] };
 	published_at: string;
 };
 

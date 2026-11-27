@@ -30,7 +30,7 @@ The JSON API through which the website browses and searches the public library (
         "curriculum": {"country": "GB", "year": "Year 5", "topic": "Verb forms"}
       },
       "selection": false,
-      "signals": {"families": 0},
+      "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
       "published_at": "2026-11-20T18:00:00Z"
     }
   ],
@@ -40,7 +40,7 @@ The JSON API through which the website browses and searches the public library (
 }
 ```
 
-Each entry has the fields of an index entry (`interface-v1.md`, Index). Every parameter is optional; together they narrow the catalogue to the items that match all of them. Values are compared without regard to case.
+Each entry has the fields of an index entry (`interface-v1.md`, Index), its signals counted when asked; a withdrawn item is left out, and a withdrawn version gives way to the latest one before it, as in the index. Every parameter is optional; together they narrow the catalogue to the items that match all of them. Values are compared without regard to case.
 
 | Parameter | Keeps the items |
 |---|---|

@@ -5,6 +5,7 @@ mod common;
 
 use axum::http::StatusCode;
 use common::*;
+use library::{Reason, Withdrawal};
 use serde_json::json;
 
 #[tokio::test]
@@ -46,7 +47,7 @@ async fn the_catalogue_lists_every_shared_item_at_its_latest_version_newest_firs
                     "curriculum": {"country": "GB", "year": "Year 5", "topic": "Verb forms"}
                 },
                 "selection": false,
-                "signals": {"families": 0},
+                "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                 "published_at": "2026-11-26T09:00:00Z"
             },
             {
@@ -65,7 +66,7 @@ async fn the_catalogue_lists_every_shared_item_at_its_latest_version_newest_firs
                     "curriculum": null
                 },
                 "selection": false,
-                "signals": {"families": 0},
+                "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                 "published_at": "2026-11-21T08:00:00Z"
             }
         ])
@@ -266,5 +267,61 @@ async fn the_filters_offer_the_languages_subjects_and_curricula_of_the_catalogue
                 {"country": "GB", "year": "Year 6", "topic": "Verb forms"}
             ]
         })
+    );
+}
+
+#[tokio::test]
+async fn a_withdrawn_item_leaves_the_catalogue_and_a_withdrawn_version_gives_way_to_the_one_before()
+{
+    let library = verbs_and_fractions().await;
+    library
+        .publish_version(verbs("Irregular verbs, part 1"), at("2026-11-22T08:00:00Z"))
+        .await
+        .unwrap();
+
+    library
+        .withdraw(
+            FRACTIONS,
+            None,
+            Withdrawal::Author,
+            at("2026-11-26T08:00:00Z"),
+        )
+        .await
+        .unwrap();
+    library
+        .withdraw(
+            VERBS,
+            Some(2),
+            Withdrawal::SwitchOff(Reason::PersonalData),
+            at("2026-11-26T08:00:00Z"),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(
+        titles(&library, "/api/catalogue").await,
+        ["Irregular verbs"]
+    );
+    let filters = get(&library, "/api/catalogue/filters").await.json();
+    assert_eq!(filters["languages"], json!(["en-GB"]));
+}
+
+#[tokio::test]
+async fn an_entry_carries_the_signals_of_the_index() {
+    let library = verbs_and_fractions().await;
+    import(&library, FAMILY_A, VERBS).await;
+    import(&library, FAMILY_B, VERBS).await;
+    post_json(
+        &library,
+        "/v1/ratings",
+        &json!({"library_identifier": FAMILY_A, "item": VERBS, "stars": 4}),
+    )
+    .await;
+
+    let answer = get(&library, "/api/catalogue?subject=english").await.json();
+
+    assert_eq!(
+        answer["items"][0]["signals"],
+        json!({"families": 2, "ratings": [0, 0, 0, 1, 0]})
     );
 }

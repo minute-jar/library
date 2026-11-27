@@ -19,7 +19,7 @@ export const verbs: Entry = {
 		curriculum: { country: 'GB', year: 'Year 5', topic: 'Verb forms' }
 	},
 	selection: false,
-	signals: { families: 0 },
+	signals: { families: 0, ratings: [0, 0, 0, 0, 0] },
 	published_at: '2026-11-20T18:00:00Z'
 };
 
@@ -39,7 +39,7 @@ export const fractions: Entry = {
 		curriculum: null
 	},
 	selection: true,
-	signals: { families: 0 },
+	signals: { families: 0, ratings: [0, 0, 0, 0, 0] },
 	published_at: '2026-11-21T08:00:00Z'
 };
 

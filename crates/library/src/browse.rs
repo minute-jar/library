@@ -55,8 +55,6 @@ fn answered(answer: Result<Value, sqlx::Error>) -> Response {
 
 /// The values the catalogue's items take, for a caller to offer as filters.
 async fn offered(pool: &PgPool) -> Result<Value, sqlx::Error> {
-    const LATEST: &str =
-        "(SELECT DISTINCT ON (item) * FROM item_versions ORDER BY item, version DESC) latest";
     let distinct =
         |field: &str| format!("SELECT DISTINCT metadata->>'{field}' FROM {LATEST} ORDER BY 1");
     let languages: Vec<(String,)> = sqlx::query_as(&distinct("language"))
@@ -135,6 +133,12 @@ impl Filter {
     }
 }
 
+/// The latest version of every shared item that is not withdrawn, as the
+/// index lists them.
+const LATEST: &str = "(SELECT DISTINCT ON (item) * FROM item_versions AS v
+     WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+     ORDER BY item, version DESC) latest";
+
 /// How many items a page of the catalogue holds.
 const PAGE_SIZE: i64 = 20;
 
@@ -148,14 +152,14 @@ type Row = (
     Option<Value>,
     Value,
     i64,
+    i64,
+    Vec<i64>,
 );
 
 /// `SELECT {columns}` over the latest version of every item that `filter`
 /// keeps; the searched words, if any, are `asked.words`.
 fn kept<'a>(columns: &str, filter: &'a Filter) -> QueryBuilder<'a, Postgres> {
-    let mut sql = QueryBuilder::new(format!(
-        "SELECT {columns} FROM (SELECT DISTINCT ON (item) * FROM item_versions ORDER BY item, version DESC) latest"
-    ));
+    let mut sql = QueryBuilder::new(format!("SELECT {columns} FROM {LATEST}"));
     if let Some(text) = &filter.text {
         // Stemmed in both languages of the catalogue, and also as typed.
         sql.push(" CROSS JOIN (SELECT websearch_to_tsquery('english', ")
@@ -210,7 +214,10 @@ async fn browse(pool: &PgPool, filter: &Filter) -> Result<Value, sqlx::Error> {
         .fetch_one(pool)
         .await?;
     let mut sql = kept(
-        "item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at",
+        "item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at,
+         (SELECT count(*) FROM imports WHERE imports.item = latest.item),
+         ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = latest.item AND ratings.stars = s)
+               FROM generate_series(1, 5) AS s ORDER BY s)",
         filter,
     );
     sql.push(" ORDER BY published_at DESC, item LIMIT ")
@@ -228,8 +235,19 @@ async fn browse(pool: &PgPool, filter: &Filter) -> Result<Value, sqlx::Error> {
 }
 
 fn entry(row: Row) -> Value {
-    let (item, version, kind, title, pseudonym, editorial, derived_from, metadata, published_at) =
-        row;
+    let (
+        item,
+        version,
+        kind,
+        title,
+        pseudonym,
+        editorial,
+        derived_from,
+        metadata,
+        published_at,
+        families,
+        ratings,
+    ) = row;
     json!({
         "item": item,
         "version": version,
@@ -240,7 +258,7 @@ fn entry(row: Row) -> Value {
         "derived_from": derived_from,
         "metadata": metadata,
         "selection": false,
-        "signals": {"families": 0},
+        "signals": {"families": families, "ratings": ratings},
         "published_at": crate::contract::time(Timestamp::from_second(published_at).expect("a stored instant")),
     })
 }
