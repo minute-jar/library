@@ -10,6 +10,7 @@ mod catalogue;
 mod http;
 mod imports;
 mod media;
+mod withdrawals;
 
 use std::sync::Arc;
 
@@ -23,6 +24,7 @@ use crate::contract::SigningKey;
 pub use crate::catalogue::PublishError;
 pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
+pub use crate::withdrawals::{Reason, WithdrawError, Withdrawal};
 
 /// A question bank or a learning path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -142,7 +144,30 @@ impl Library {
         imports::record(&self.pool, library_identifier, item).await
     }
 
-    /// Signs the index again at `now`, before it expires.
+    /// Withdraws a shared item, or one of its versions when `version` is
+    /// given: it enters the withdrawal list and leaves the index.
+    pub async fn withdraw(
+        &self,
+        item: &str,
+        version: Option<u32>,
+        withdrawal: Withdrawal,
+        now: Timestamp,
+    ) -> Result<(), WithdrawError> {
+        withdrawals::withdraw(&self.pool, &self.signing, item, version, withdrawal, now).await
+    }
+
+    /// Ends a switch-off: the item or version leaves the withdrawal list and
+    /// comes back to the index.
+    pub async fn reactivate(
+        &self,
+        item: &str,
+        version: Option<u32>,
+        now: Timestamp,
+    ) -> Result<(), WithdrawError> {
+        withdrawals::reactivate(&self.pool, &self.signing, item, version, now).await
+    }
+
+    /// Signs the index and the withdrawal list again at `now`, before they expire.
     pub async fn refresh(&self, now: Timestamp) -> Result<(), sqlx::Error> {
         catalogue::refresh(&self.pool, &self.signing, now).await
     }

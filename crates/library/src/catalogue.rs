@@ -130,7 +130,7 @@ const INDEX_LIFETIME: jiff::SignedDuration = jiff::SignedDuration::from_hours(72
 
 pub const INDEX_PATH: &str = "/v1/index";
 
-/// Signs the index again at `now`, as the catalogue stands.
+/// Signs the index and the withdrawal list again at `now`, as the catalogue stands.
 pub async fn refresh(
     pool: &PgPool,
     signing: &SigningKey,
@@ -141,10 +141,11 @@ pub async fn refresh(
         .execute(&mut *tx)
         .await?;
     sign_index(&mut tx, signing, now).await?;
+    crate::withdrawals::sign(&mut tx, signing, now).await?;
     tx.commit().await
 }
 
-async fn sign_index(
+pub(crate) async fn sign_index(
     tx: &mut Transaction<'_, Postgres>,
     signing: &SigningKey,
     now: Timestamp,
@@ -163,8 +164,10 @@ async fn sign_index(
     );
     let latest: Vec<Row> = sqlx::query_as(
         "SELECT DISTINCT ON (item) item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at,
-                (SELECT count(*) FROM imports WHERE imports.item = item_versions.item)
-         FROM item_versions ORDER BY item, version DESC",
+                (SELECT count(*) FROM imports WHERE imports.item = v.item)
+         FROM item_versions AS v
+         WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+         ORDER BY item, version DESC",
     )
     .fetch_all(&mut **tx)
     .await?;
@@ -193,7 +196,7 @@ async fn sign_index(
     store(tx, INDEX_PATH, &index).await
 }
 
-async fn store(
+pub(crate) async fn store(
     tx: &mut Transaction<'_, Postgres>,
     path: &str,
     body: &str,
