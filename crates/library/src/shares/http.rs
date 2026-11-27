@@ -64,6 +64,12 @@ impl IntoResponse for Refused {
                 ShareRefusal::SharingTermsRequired => {
                     (StatusCode::FORBIDDEN, "sharing_terms_required")
                 }
+                ShareRefusal::UnknownItem => (StatusCode::NOT_FOUND, "unknown_item"),
+                ShareRefusal::NotTheAuthor => (StatusCode::FORBIDDEN, "not_the_author"),
+                ShareRefusal::WithdrawnItem => (StatusCode::CONFLICT, "withdrawn_item"),
+                ShareRefusal::UnknownOrigin => (StatusCode::NOT_FOUND, "unknown_original"),
+                ShareRefusal::BadOrigin => (StatusCode::BAD_REQUEST, "bad_original"),
+                ShareRefusal::OriginChanged => (StatusCode::CONFLICT, "original_changed"),
                 ShareRefusal::BadItem => (StatusCode::BAD_REQUEST, "bad_item"),
                 ShareRefusal::BadContent => (StatusCode::BAD_REQUEST, "bad_content"),
                 ShareRefusal::MediumTooLarge => (StatusCode::BAD_REQUEST, "medium_too_large"),

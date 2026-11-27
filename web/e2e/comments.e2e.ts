@@ -10,7 +10,7 @@ test('a parent with a library account comments on an item under their pseudonym'
 
 	await page.goto('/account');
 	await page.getByRole('link', { name: 'Sign in with your Minute Jar account' }).click();
-	await page.getByRole('textbox', { name: 'Pseudonym' }).fill('Heron');
+	await page.getByRole('textbox', { name: 'Pseudonym' }).fill('Plover');
 	await page.getByRole('radio', { name: /A separate account for the library/ }).check();
 	await page.getByRole('checkbox', { name: /I am an adult and a parent/ }).check();
 	await page.getByRole('button', { name: 'Open my library account' }).click();
@@ -21,7 +21,7 @@ test('a parent with a library account comments on an item under their pseudonym'
 
 	await expect(page.getByText('Your comment is published.')).toBeVisible();
 	const comment = page.getByRole('listitem').filter({ hasText: 'We do five verbs a day.' });
-	await expect(comment).toContainText('Heron');
+	await expect(comment).toContainText('Plover');
 
 	await comment.getByText('Report this comment').click();
 	await comment.getByRole('combobox', { name: 'Reason' }).selectOption('unsuitable_content');

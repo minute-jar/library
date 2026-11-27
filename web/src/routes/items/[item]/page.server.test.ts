@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SESSION_COOKIE } from '#lib/server/accounts.ts';
-import { fakeApi, verbs, verbsPage, verbsRatings } from '#lib/server/testing/fake-api.ts';
+import {
+	fakeApi,
+	moreVerbs,
+	verbs,
+	verbsPage,
+	verbsRatings
+} from '#lib/server/testing/fake-api.ts';
 import { fakeAccounts, fakeCookies } from '#lib/server/testing/fake-accounts.ts';
 import { fakeComments } from '#lib/server/testing/fake-comments.ts';
 import { actions, load } from './+page.server.ts';
@@ -56,10 +62,37 @@ describe('the item page', () => {
 		expect(data.item).toEqual(verbsPage);
 		expect(data.ratings).toEqual(verbsRatings);
 		expect(data.signedIn).toBe(false);
+		expect(data.original).toBeNull();
 		expect(api.asked.sort()).toEqual([
 			`/api/items/${verbs.item}`,
 			`/api/items/${verbs.item}/ratings`
 		]);
+	});
+
+	it('shows a derived work with its original, attributed and linked by title', async () => {
+		const { data } = await visit(moreVerbs.item);
+
+		expect(data.item).toEqual(moreVerbs);
+		expect(data.original).toEqual({
+			item: verbs.item,
+			version: 1,
+			pseudonym: 'Owl',
+			title: 'Irregular verbs, part 1'
+		});
+	});
+
+	it('keeps the attribution of an original the catalogue no longer shows', async () => {
+		const set = setUp();
+		delete set.api.items[verbs.item];
+
+		const { data } = await visit(moreVerbs.item, set);
+
+		expect(data.original).toEqual({
+			item: verbs.item,
+			version: 1,
+			pseudonym: 'Owl',
+			title: null
+		});
 	});
 
 	it('answers 404 for an item the catalogue does not show', async () => {
