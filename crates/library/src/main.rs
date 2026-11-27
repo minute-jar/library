@@ -6,7 +6,10 @@
 //!   signed for that signing key;
 //! - `LIBRARY_MEDIA_DIR`: the directory holding the media of shared items,
 //!   until the S3-compatible store is wired at deployment;
-//! - `LIBRARY_LISTEN`: the address to listen on, `127.0.0.1:8080` by default.
+//! - `LIBRARY_LISTEN`: the address to listen on, `127.0.0.1:8080` by default;
+//! - `LIBRARY_IDENTIFICATION_DAYS`: how many days the identification data of
+//!   a closed library account is kept after its last share, 365 by default
+//!   (ticket 26).
 //!
 //! Reports answer `503` until a review adapter (ticket 13) and a notifier
 //! are wired here with `Library::with_reports`.
@@ -19,7 +22,7 @@ use std::time::Duration;
 
 use jiff::Timestamp;
 use library::contract::SigningKey;
-use library::{Library, LocalDirectory};
+use library::{IDENTIFICATION_RETENTION, Library, LocalDirectory};
 
 fn required(name: &str) -> String {
     std::env::var(name).unwrap_or_else(|_| panic!("{name} must be set"))
@@ -65,6 +68,31 @@ async fn main() {
             if let Err(error) = forgetting.forget_sign_ins(Timestamp::now()).await {
                 eprintln!("expired sessions and sign-ins could not be forgotten: {error}");
             }
+        }
+    });
+
+    // The identification data of closed accounts is erased once the legal period is over.
+    let kept_for = std::env::var("LIBRARY_IDENTIFICATION_DAYS")
+        .ok()
+        .map(|days| {
+            let days: i64 = days
+                .parse()
+                .expect("LIBRARY_IDENTIFICATION_DAYS is a number of days");
+            jiff::SignedDuration::from_hours(days * 24)
+        })
+        .unwrap_or(IDENTIFICATION_RETENTION);
+    let erasing = library.clone();
+    tokio::spawn(async move {
+        loop {
+            if let Err(error) = erasing
+                .erase_identifications(Timestamp::now(), kept_for)
+                .await
+            {
+                eprintln!(
+                    "the identification data of closed accounts could not be erased: {error}"
+                );
+            }
+            tokio::time::sleep(Duration::from_secs(3600)).await;
         }
     });
 

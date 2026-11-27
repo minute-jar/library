@@ -18,7 +18,8 @@
 		statement_required: m.refused_statement_required,
 		choice_required: m.refused_choice_required,
 		strong_sign_in_required: m.refused_strong_sign_in_required,
-		account_exists: m.refused_account_exists
+		account_exists: m.refused_account_exists,
+		confirmation_required: m.refused_confirmation_required
 	};
 	const code = $derived(form && 'refused' in form ? form.refused : null);
 	const refused = $derived(code ? (refusals[code] ?? m.refused_other)() : null);
@@ -39,6 +40,9 @@
 {/if}
 {#if refused}
 	<p role="alert" class="mb-4 text-destructive">{refused}</p>
+{/if}
+{#if form && 'closed' in form}
+	<p role="status" class="mb-4">{m.closed()}</p>
 {/if}
 
 {#if !data.signedIn}
@@ -75,6 +79,30 @@
 			</form>
 		</Card.Content>
 	</Card.Root>
+
+	<section class="mt-8 grid max-w-xl gap-3" aria-labelledby="close-title">
+		<h2 id="close-title" class="text-lg font-semibold">{m.close_title()}</h2>
+		<p class="text-sm">{m.close_what()}</p>
+		<p class="text-sm text-muted-foreground">{m.close_kept()}</p>
+		{#if mustSignInAgain}
+			<p class="text-sm">{m.close_strong()}</p>
+			<div>
+				<Button href={href('/sign-in?strong')} data-sveltekit-reload variant="outline">
+					{m.sign_in_strong_button()}
+				</Button>
+			</div>
+		{:else}
+			<form method="post" action="?/close" class="grid gap-3">
+				<label class="flex gap-3 text-sm">
+					<input type="checkbox" name="understood" required />
+					<span>{m.close_understood()}</span>
+				</label>
+				<div>
+					<Button type="submit" variant="destructive">{m.close_submit()}</Button>
+				</div>
+			</form>
+		{/if}
+	</section>
 {:else if mustSignInAgain}
 	<Card.Root class="max-w-xl">
 		<Card.Header>

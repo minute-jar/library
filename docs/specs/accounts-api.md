@@ -31,7 +31,7 @@ The session lasts 30 days. It travels as `Authorization: Bearer <session>` on ev
 
 ### Strong and recent
 
-The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening a library account needs a recent strong sign-in; sharing (ticket 12) and linking a subscription will too.
+The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is **strong** when `acr` is `aal2` (a second factor) or `amr` holds `passkey`, `webauthn` or `oidc` (Google, Apple, Microsoft). An e-mail code or a password alone is not strong. A strong sign-in is **recent** for 15 minutes after `auth_time`. Opening and closing a library account need a recent strong sign-in; sharing (ticket 12) and linking a subscription will too.
 
 ## Session
 
@@ -58,12 +58,22 @@ An account, as its owner sees it:
 - `GET /api/account` answers the account, or `404` `no_account`.
 - `PUT /api/account/pseudonym` with `{"pseudonym"}` changes it: `200` with the account; `bad_pseudonym`, `pseudonym_taken`, `no_account` as above.
 
+### Closing
+
+`DELETE /api/account` closes the library account (story S12): `204`. Refusals, in this order: `403` `strong_sign_in_required` (as for opening), `404` `no_account`.
+
+- Every session of the Minute Jar account ends at once, on every device.
+- The items it shared stay published under their licence, with its pseudonym: their signed versions do not change.
+- Its pseudonym stays reserved: no account may take it again, without regard to case.
+- The library account is no longer joined to the Minute Jar account, whose next sign-in finds no account and may open another, under another pseudonym.
+- Its identification data is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Sharing (ticket 12) records the last share in `identifications.last_shared_at`.
+
 A body that is not exactly the expected object (an unknown field, a library identifier among them) answers `400` `{"error": "bad_request"}`.
 
 ## What is kept and what is answered
 
 - No answer carries a name, an e-mail address or the Minute Jar account's subject (`tests/account_privacy.rs` scans every route).
-- A name is never received. The verified e-mail of a strong sign-in is kept with the session only while the sign-in is recent and the Minute Jar account has no library account; on opening, it moves to the account's identification data (table `identifications`), kept for the legal period (ticket 26) and answered by no route. `Library::forget_sign_ins(now)`, called every five minutes, removes expired sessions, sign-ins that never came back, and the e-mail of sign-ins no longer recent.
+- A name is never received. The verified e-mail of a strong sign-in is kept with the session only while the sign-in is recent and the Minute Jar account has no library account; on opening, it moves to the account's identification data (table `identifications`), kept while the account is open, then for the legal period after its last share (see Closing), and answered by no route. `Library::forget_sign_ins(now)`, called every five minutes, removes expired sessions, sign-ins that never came back, and the e-mail of sign-ins no longer recent.
 - A session is never joined to a library identifier: no table of accounts has one, account routes refuse one, and a family server's call carrying a session is refused (`interface-v1.md`, Library identifier).
 
 ## HTTP

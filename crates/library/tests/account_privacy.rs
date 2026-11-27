@@ -72,6 +72,8 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             "/api/account/pseudonym".into(),
             Some(json!({"pseudonym": "Barn owl"})),
         ),
+        // Closing ends the session: last but one.
+        ("DELETE", "/api/account".into(), None),
         ("DELETE", "/api/session".into(), None),
     ]
 }

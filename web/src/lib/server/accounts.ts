@@ -98,6 +98,10 @@ export function accounts(fetch: typeof globalThis.fetch, root: string = LIBRARY_
 		},
 		rename(session: string, pseudonym: string) {
 			return call<Account>('PUT', '/api/account/pseudonym', { session, body: { pseudonym } });
+		},
+		/** Closes the library account; every session of its Minute Jar account ends. */
+		close(session: string) {
+			return call<void>('DELETE', '/api/account', { session });
 		}
 	};
 }

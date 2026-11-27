@@ -26,6 +26,8 @@ const refused = (status: number, error: string) => json({ error }, status);
 export function fakeAccounts(provider = 'https://id.example'): FakeAccounts {
 	const started = new Set<string>();
 	const strongSessions = new Set<string>();
+	/** The pseudonyms of closed accounts, which stay reserved. */
+	const closed = new Set<string>();
 	let next = 0;
 
 	function open(subject: string, strong: boolean) {
@@ -82,9 +84,11 @@ export function fakeAccounts(provider = 'https://id.example'): FakeAccounts {
 			if (account) return refused(409, 'account_exists');
 			if (fields.adult_and_parent !== true) return refused(400, 'statement_required');
 			const pseudonym = String(fields.pseudonym).trim();
-			const taken = [...fake.accounts.values()].some(
-				(other) => other.pseudonym.toLowerCase() === pseudonym.toLowerCase()
-			);
+			const taken =
+				closed.has(pseudonym.toLowerCase()) ||
+				[...fake.accounts.values()].some(
+					(other) => other.pseudonym.toLowerCase() === pseudonym.toLowerCase()
+				);
 			if (pseudonym.length < 3 || pseudonym.includes('@')) return refused(400, 'bad_pseudonym');
 			if (taken) return refused(409, 'pseudonym_taken');
 			const opened: Account = {
@@ -94,6 +98,16 @@ export function fakeAccounts(provider = 'https://id.example'): FakeAccounts {
 			};
 			fake.accounts.set(subject, opened);
 			return json(opened, 201);
+		}
+		if (url.pathname === '/api/account' && request.method === 'DELETE') {
+			if (!strongSessions.has(bearer)) return refused(403, 'strong_sign_in_required');
+			if (!account) return refused(404, 'no_account');
+			closed.add(account.pseudonym.toLowerCase());
+			fake.accounts.delete(subject);
+			for (const [other, owner] of fake.sessions) {
+				if (owner === subject) fake.sessions.delete(other);
+			}
+			return new Response(null, { status: 204 });
 		}
 		if (url.pathname === '/api/account/pseudonym' && request.method === 'PUT') {
 			if (!account) return refused(404, 'no_account');
