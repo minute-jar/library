@@ -143,16 +143,18 @@ async fn sign_index(
         Option<Value>,
         Value,
         i64,
+        i64,
     );
     let latest: Vec<Row> = sqlx::query_as(
-        "SELECT DISTINCT ON (item) item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at
+        "SELECT DISTINCT ON (item) item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at,
+                (SELECT count(*) FROM imports WHERE imports.item = item_versions.item)
          FROM item_versions ORDER BY item, version DESC",
     )
     .fetch_all(&mut **tx)
     .await?;
     let items: Vec<Value> = latest
         .into_iter()
-        .map(|(item, version, kind, title, pseudonym, editorial, derived_from, metadata, published_at)| {
+        .map(|(item, version, kind, title, pseudonym, editorial, derived_from, metadata, published_at, families)| {
             json!({
                 "item": item,
                 "version": version,
@@ -163,7 +165,7 @@ async fn sign_index(
                 "derived_from": derived_from,
                 "metadata": metadata,
                 "selection": false,
-                "signals": {"families": 0},
+                "signals": {"families": families},
                 "published_at": crate::contract::time(Timestamp::from_second(published_at).expect("a stored instant")),
             })
         })

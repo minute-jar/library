@@ -8,6 +8,7 @@ pub mod contract;
 
 mod catalogue;
 mod http;
+mod imports;
 
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ use sqlx::PgPool;
 use crate::contract::SigningKey;
 
 pub use crate::catalogue::PublishError;
+pub use crate::imports::ImportError;
 
 /// A question bank or a learning path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -120,6 +122,17 @@ impl Library {
         now: Timestamp,
     ) -> Result<u32, PublishError> {
         catalogue::publish(&self.pool, &self.signing, version, now).await
+    }
+
+    /// Records that the family server under `library_identifier` imported
+    /// the shared item `item`. The index counts each identifier once per item,
+    /// from the next time it is signed.
+    pub async fn record_import(
+        &self,
+        library_identifier: &str,
+        item: &str,
+    ) -> Result<(), ImportError> {
+        imports::record(&self.pool, library_identifier, item).await
     }
 
     /// Signs the index again at `now`, before it expires.
