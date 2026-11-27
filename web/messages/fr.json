@@ -85,5 +85,17 @@
 	"refused_choice_required": "Choisissez le compte Minute Jar à utiliser.",
 	"refused_strong_sign_in_required": "Votre connexion n'est plus assez récente. Reconnectez-vous.",
 	"refused_account_exists": "Ce compte Minute Jar a déjà un compte bibliothèque.",
-	"refused_other": "Cela n'a pas pu être fait. Réessayez."
+	"refused_other": "Cela n'a pas pu être fait. Réessayez.",
+	"card_link": "Votre carte",
+	"card_title": "Votre carte",
+	"card_why": "Pour partager, un compte bibliothèque a besoin d'une carte vérifiée : elle s'appuie sur le contrôle de votre banque, pour que quelqu'un réponde de ce qui est partagé. La bibliothèque ne voit jamais le numéro de la carte et n'affiche jamais votre carte.",
+	"card_subscription": "La carte de votre abonnement est utilisée s'il en a une : vous ne la saisissez pas à nouveau.",
+	"card_check": "Sinon, une vérification à zéro euro : vous saisissez une carte chez le prestataire de paiement, et votre banque peut vous demander de confirmer. Rien n'est débité.",
+	"card_submit": "Vérifier ma carte",
+	"card_verified_subscription": "Votre carte est vérifiée, par la carte de votre abonnement, le {date}.",
+	"card_verified_check": "Votre carte est vérifiée, par une vérification à zéro euro, le {date}.",
+	"card_pending": "La vérification n'est pas terminée. Vérifiez à nouveau votre carte pour en commencer une autre.",
+	"card_refused": "Votre banque ou le prestataire de paiement a refusé la vérification. Vous pouvez réessayer, avec une autre carte si besoin.",
+	"card_sign_in_strong": "Pour vérifier une carte, reconnectez-vous avec une clé d'accès, Google, Apple, Microsoft, ou un mot de passe avec un code de votre application d'authentification.",
+	"refused_card_verified": "Votre carte est déjà vérifiée."
 }

@@ -9,6 +9,7 @@ pub mod contract;
 
 mod accounts;
 mod browse;
+mod cards;
 mod catalogue;
 mod http;
 mod imports;
@@ -31,6 +32,10 @@ use crate::contract::SigningKey;
 pub use crate::accounts::{
     Account, AccountError, Authorization, IdToken, IdentityProvider, MinuteJarAccount,
     ProviderError, ProviderFuture, code_challenge,
+};
+pub use crate::cards::{
+    Card, CardError, CardFuture, CardVerifier, CheckResult, StartedCheck, SubscriptionCards,
+    VerifiedBy, VerifiedCard,
 };
 pub use crate::catalogue::PublishError;
 pub use crate::imports::ImportError;
@@ -120,6 +125,7 @@ pub struct Library {
     keys_document: Arc<catalogue::Stored>,
     media: Arc<dyn MediaStore>,
     accounts: Option<Arc<accounts::Desk>>,
+    cards: Option<Arc<cards::Desk>>,
     reports: Option<Arc<reports::Desk>>,
 }
 
@@ -142,6 +148,7 @@ impl Library {
             keys_document: Arc::new(catalogue::Stored::new(keys_document)),
             media: Arc::new(media),
             accounts: None,
+            cards: None,
             reports: None,
         })
     }
@@ -159,6 +166,30 @@ impl Library {
             clock: Box::new(clock),
         }));
         self
+    }
+
+    /// Turns on the verification of library accounts' cards: by a
+    /// zero-amount check through `verifier`, or by the subscription's card
+    /// from `subscriptions` when the account is on the subscription's Minute
+    /// Jar account. Needs [`Library::with_accounts`]; without it, the card's
+    /// routes are refused as unavailable.
+    pub fn with_cards(
+        mut self,
+        verifier: impl CardVerifier,
+        subscriptions: impl SubscriptionCards,
+    ) -> Self {
+        self.cards = Some(Arc::new(cards::Desk {
+            verifier: Box::new(verifier),
+            subscriptions: Box::new(subscriptions),
+        }));
+        self
+    }
+
+    /// The other library accounts, by pseudonym, verified with the same card
+    /// as the account under `pseudonym`: a card may serve several accounts,
+    /// and the operator knows it (ADR-0007).
+    pub async fn accounts_sharing_card(&self, pseudonym: &str) -> Result<Vec<String>, sqlx::Error> {
+        cards::accounts_sharing_card(&self.pool, pseudonym).await
     }
 
     /// Forgets at `now` what sign-in no longer needs: expired sessions,
@@ -306,6 +337,7 @@ impl Library {
             .merge(browse::router(self.clone()))
             .merge(item_page::router(self.clone()))
             .merge(accounts::http::router(self.clone()))
+            .merge(cards::http::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,
             ))

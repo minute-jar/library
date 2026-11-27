@@ -72,6 +72,9 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             "/api/account/pseudonym".into(),
             Some(json!({"pseudonym": "Barn owl"})),
         ),
+        ("GET", "/api/account/card".into(), None),
+        ("POST", "/api/account/card".into(), None),
+        ("POST", "/api/account/card/check".into(), None),
         ("DELETE", "/api/session".into(), None),
     ]
 }
