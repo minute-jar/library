@@ -11,6 +11,7 @@ mod browse;
 mod catalogue;
 mod http;
 mod imports;
+mod item_page;
 mod media;
 mod ratings;
 mod reports;
@@ -272,6 +273,8 @@ impl Library {
 
     /// The HTTP interface.
     pub fn router(&self) -> axum::Router {
-        http::router(self.clone()).merge(browse::router(self.clone()))
+        http::router(self.clone())
+            .merge(browse::router(self.clone()))
+            .merge(item_page::router(self.clone()))
     }
 }
