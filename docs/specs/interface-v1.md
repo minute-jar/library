@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index and shared items. The withdrawal list, media, imports, ratings, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items and the withdrawal list. Media, imports, ratings, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
 
 ## Signed documents
 
@@ -26,9 +26,9 @@ Every payload is a JSON object that begins with these fields:
 | Field | Meaning |
 |---|---|
 | `contract` | `1` for this version. A family server refuses a version it does not know. |
-| `kind` | `keys`, `index` or `item`. A family server refuses a document of another kind than the one it asked for. |
+| `kind` | `keys`, `index`, `item` or `withdrawals`. A family server refuses a document of another kind than the one it asked for. |
 | `issued_at` | When the library signed it, RFC 3339 in UTC to the second. |
-| `expires_at` | For `keys` and `index` only: after this instant the document is no longer current and is refused. |
+| `expires_at` | For `keys`, `index` and `withdrawals` only: after this instant the document is no longer current and is refused. |
 
 Times are always RFC 3339 in UTC to the second, such as `2026-11-26T09:00:00Z`.
 
@@ -86,7 +86,7 @@ A family server accepts another signed document only if its `key` is listed in a
 }
 ```
 
-- One entry per shared item, at its latest published version, ordered by `item`.
+- One entry per shared item, at its latest published version that is not withdrawn, ordered by `item`. A withdrawn item leaves the index.
 - `type` is `bank` or `path`. `licence` is always `CC-BY-SA-4.0` (ADR-0001).
 - `author.editorial` is true for the operator's editorial account (ADR-0002).
 - `derived_from` is `null` or `{"item", "version", "pseudonym"}` of the original.
@@ -119,9 +119,31 @@ A family server accepts another signed document only if its `key` is listed in a
 - `content` is in the bank format of the main repository; this version of the contract does not constrain it further.
 - A shared item does not expire: a version, once published, does not change. A withdrawal is announced by the withdrawal list.
 
+## Withdrawals
+
+`GET /v1/withdrawals` answers the withdrawal list, signed by a signing key, identical for every caller:
+
+```json
+{
+  "contract": 1,
+  "kind": "withdrawals",
+  "issued_at": "2026-11-26T09:00:00Z",
+  "expires_at": "2026-11-27T09:00:00Z",
+  "withdrawals": [
+    {"item": "<32 hex>", "version": null, "kind": "switch_off", "reason": "personal_data", "withdrawn_at": "2026-11-26T09:00:00Z"}
+  ]
+}
+```
+
+- One entry per withdrawn item or version, ordered by `item` then `version`. `version` is `null` when every version of the item is withdrawn.
+- `kind` is `author` (the author's choice), `switch_off` (provisional, until a moderator decides) or `moderation` (a moderation decision).
+- `reason` is `author_choice` for the author's kind, otherwise one of `rights`, `personal_data`, `sexual_content`, `illegal_content`, `unsuitable_content`, `wrong_answer`, `other`.
+- A family server stops using a listed item or version and tells the parents the reason. An item no longer switched off leaves the list.
+- A withdrawal list lives one day; the library issues a new one whenever the catalogue changes and at least every six hours.
+
 ## HTTP
 
 - Every signed document is served as `application/json` with a strong `ETag`; a request whose `If-None-Match` names it answers `304 Not Modified` without a body.
-- `Cache-Control`: `public, max-age=3600` for keys, `public, max-age=300` for the index, `public, max-age=86400` for an item version.
+- `Cache-Control`: `public, max-age=3600` for keys, `public, max-age=300` for the index and the withdrawal list, `public, max-age=86400` for an item version.
 - The bytes served are the same for every caller; nothing in a request changes them.
 - An unknown item answers `404` with `{"error": "unknown_item"}`, an unknown version of a known item `404` with `{"error": "unknown_version"}`.

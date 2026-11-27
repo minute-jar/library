@@ -36,13 +36,13 @@ async fn main() {
     .await
     .expect("the database is brought up to date");
 
-    // The index lives three days; sign it again well before.
+    // The index lives three days and the withdrawal list one; sign them again well before.
     let refreshing = library.clone();
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(6 * 3600)).await;
             if let Err(error) = refreshing.refresh(Timestamp::now()).await {
-                eprintln!("the index could not be signed again: {error}");
+                eprintln!("the index and the withdrawal list could not be signed again: {error}");
             }
         }
     });

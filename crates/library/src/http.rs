@@ -16,12 +16,14 @@ use crate::catalogue::{self, Stored, item_path};
 const KEYS_CACHE: &str = "public, max-age=3600";
 const INDEX_CACHE: &str = "public, max-age=300";
 const ITEM_CACHE: &str = "public, max-age=86400";
+const WITHDRAWALS_CACHE: &str = "public, max-age=300";
 
 pub fn router(library: Library) -> Router {
     Router::new()
         .route("/.well-known/minute-jar-library.json", get(keys))
         .route("/v1/index", get(index))
         .route("/v1/items/{item}/versions/{version}", get(item_version))
+        .route("/v1/withdrawals", get(withdrawals))
         .with_state(library)
 }
 
@@ -32,6 +34,13 @@ async fn keys(State(library): State<Library>, request: HeaderMap) -> Response {
 async fn index(State(library): State<Library>, request: HeaderMap) -> Response {
     match catalogue::document(&library.pool, catalogue::INDEX_PATH).await {
         Ok(Some(stored)) => served(&stored, INDEX_CACHE, &request),
+        _ => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    }
+}
+
+async fn withdrawals(State(library): State<Library>, request: HeaderMap) -> Response {
+    match catalogue::document(&library.pool, crate::withdrawals::PATH).await {
+        Ok(Some(stored)) => served(&stored, WITHDRAWALS_CACHE, &request),
         _ => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
 }
