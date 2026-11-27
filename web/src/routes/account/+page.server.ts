@@ -72,5 +72,20 @@ export const actions = {
 		} catch (failure) {
 			return refusal(failure, { pseudonym });
 		}
+	},
+
+	close: async ({ request, fetch, cookies }) => {
+		const form = await request.formData();
+		const session = cookies.get(SESSION_COOKIE);
+		if (!session) return fail(401, { refused: 'signed_out' });
+		if (form.get('understood') !== 'on') return fail(400, { refused: 'confirmation_required' });
+		try {
+			await accounts(fetch).close(session);
+		} catch (failure) {
+			return refusal(failure, {});
+		}
+		// The service has ended every session of the Minute Jar account.
+		cookies.delete(SESSION_COOKIE, { path: '/' });
+		return { closed: true };
 	}
 } satisfies Actions;

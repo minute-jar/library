@@ -27,3 +27,24 @@ test('a parent signs in and opens a library account under a pseudonym', async ({
 		page.getByRole('link', { name: 'Sign in with your Minute Jar account' })
 	).toBeVisible();
 });
+
+test('a parent closes their library account and is signed out', async ({ page }) => {
+	await page.goto('/account');
+	await page.getByRole('link', { name: 'Sign in with your Minute Jar account' }).click();
+	await page.getByRole('textbox', { name: 'Pseudonym' }).fill('Wren');
+	await page.getByRole('radio', { name: /A separate account for the library/ }).check();
+	await page.getByRole('checkbox', { name: /I am an adult and a parent/ }).check();
+	await page.getByRole('button', { name: 'Open my library account' }).click();
+	await expect(page.getByRole('heading', { name: 'Wren' })).toBeVisible();
+
+	await expect(
+		page.getByText(/Your shared items stay published under their licence/)
+	).toBeVisible();
+	await page.getByRole('checkbox', { name: /my shared items stay published/ }).check();
+	await page.getByRole('button', { name: 'Close my library account' }).click();
+
+	await expect(page.getByRole('status')).toHaveText(/Your library account is closed/);
+	await expect(
+		page.getByRole('link', { name: 'Sign in with your Minute Jar account' })
+	).toBeVisible();
+});

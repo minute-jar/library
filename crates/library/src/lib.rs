@@ -28,6 +28,7 @@ use sqlx::PgPool;
 
 use crate::contract::SigningKey;
 
+pub use crate::accounts::closing::IDENTIFICATION_RETENTION;
 pub use crate::accounts::{
     Account, AccountError, Authorization, IdToken, IdentityProvider, MinuteJarAccount,
     ProviderError, ProviderFuture, code_challenge,
@@ -168,6 +169,18 @@ impl Library {
         accounts::forget(&self.pool, now).await
     }
 
+    /// Erases at `now` the identification data of closed library accounts
+    /// once `kept_for` has passed since their last share
+    /// ([`IDENTIFICATION_RETENTION`] by default, the legal period), and at
+    /// once for those that never shared. To be called every day or so.
+    pub async fn erase_identifications(
+        &self,
+        now: Timestamp,
+        kept_for: jiff::SignedDuration,
+    ) -> Result<(), sqlx::Error> {
+        accounts::closing::erase_identifications(&self.pool, now, kept_for).await
+    }
+
     /// Publishes the next version of a shared item; answers its version number.
     pub async fn publish_version(
         &self,
@@ -306,6 +319,7 @@ impl Library {
             .merge(browse::router(self.clone()))
             .merge(item_page::router(self.clone()))
             .merge(accounts::http::router(self.clone()))
+            .merge(accounts::closing::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,
             ))
