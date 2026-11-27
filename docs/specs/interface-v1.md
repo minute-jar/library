@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index, shared items and the withdrawal list. Media, imports, ratings, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items, the withdrawal list and imports. Media, ratings, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
 
 ## Signed documents
 
@@ -92,6 +92,7 @@ A family server accepts another signed document only if its `key` is listed in a
 - `derived_from` is `null` or `{"item", "version", "pseudonym"}` of the original.
 - `metadata.language` is a BCP 47 tag; `curriculum` may be `null`.
 - An index lives three days; the library issues a new one at least daily.
+- `signals.families` is the number of distinct library identifiers that reported importing the item, at any of its versions, as of when the index was signed (see Imports). A family server whose parent renews its library identifier counts again under the new one.
 
 ## Shared items
 
@@ -140,6 +141,33 @@ A family server accepts another signed document only if its `key` is listed in a
 - `reason` is `author_choice` for the author's kind, otherwise one of `rights`, `personal_data`, `sexual_content`, `illegal_content`, `unsuitable_content`, `wrong_answer`, `other`.
 - A family server stops using a listed item or version and tells the parents the reason. An item no longer switched off leaves the list.
 - A withdrawal list lives one day; the library issues a new one whenever the catalogue changes and at least every six hours.
+
+## Library identifier
+
+A family server draws its **library identifier** for one library alone: 128 random bits from a cryptographic source, written as 32 lowercase hexadecimal digits. It is linked to nothing else, and a parent may draw a new one at any time. Every anonymous call a family server makes to the library (imports here; ratings, reports, suggestions and, in step 2, contributions in later versions) carries it the same way:
+
+- as the field `library_identifier` of a JSON request body, `POST`ed with `Content-Type: application/json`;
+- never in a path, a query string, a header or a cookie, so that no access log in front of the library records it;
+- never in the same request as a library account's session: a share carries no library identifier, and a call carrying a library identifier carries no session.
+
+The library keeps an identifier only with what the call needs for its effect (for an import, the item imported), never with a time, an address or an account, and no route answers anything about an identifier. Technical logs of anonymous calls, if the operator keeps any, hold no request body and are kept briefly.
+
+A malformed identifier answers `400` with `{"error": "bad_library_identifier"}`; a body that is not the expected JSON object answers `400` with `{"error": "bad_request"}`.
+
+## Imports
+
+When a family server imports a shared item into its family library, it tells the library once:
+
+```
+POST /v1/imports
+Content-Type: application/json
+
+{"library_identifier": "<32 hex>", "item": "<32 hex>"}
+```
+
+- The answer is `204 No Content`, with no body and no cookie. Reporting the same item again under the same identifier, at another version or not, changes nothing and answers `204` too.
+- An unknown item answers `404` with `{"error": "unknown_item"}`.
+- The import counts in `signals.families` of the next index the library signs; the index served until then is unchanged.
 
 ## HTTP
 

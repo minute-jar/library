@@ -5,13 +5,15 @@
 //! the same thing (`docs/specs/interface-v1.md`, HTTP).
 
 use axum::Router;
+use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
+use serde::Deserialize;
 
-use crate::Library;
 use crate::catalogue::{self, Stored, item_path};
+use crate::{ImportError, Library};
 
 const KEYS_CACHE: &str = "public, max-age=3600";
 const INDEX_CACHE: &str = "public, max-age=300";
@@ -24,6 +26,7 @@ pub fn router(library: Library) -> Router {
         .route("/v1/index", get(index))
         .route("/v1/items/{item}/versions/{version}", get(item_version))
         .route("/v1/withdrawals", get(withdrawals))
+        .route("/v1/imports", post(import))
         .with_state(library)
 }
 
@@ -64,6 +67,33 @@ async fn item_version(
         Ok(Some(stored)) => served(&stored, ITEM_CACHE, &request),
         Ok(None) => refused(StatusCode::NOT_FOUND, "unknown_version"),
         Err(_) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    }
+}
+
+/// An import reported by a family server. The library identifier travels in
+/// the body only, never in the path, a header or a cookie, so that no access
+/// log in front of the service records it.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Import {
+    library_identifier: String,
+    item: String,
+}
+
+async fn import(State(library): State<Library>, body: Bytes) -> Response {
+    let Ok(import) = serde_json::from_slice::<Import>(&body) else {
+        return refused(StatusCode::BAD_REQUEST, "bad_request");
+    };
+    match library
+        .record_import(&import.library_identifier, &import.item)
+        .await
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(ImportError::BadIdentifier) => {
+            refused(StatusCode::BAD_REQUEST, "bad_library_identifier")
+        }
+        Err(ImportError::UnknownItem) => refused(StatusCode::NOT_FOUND, "unknown_item"),
+        Err(ImportError::Database(_)) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
 }
 
