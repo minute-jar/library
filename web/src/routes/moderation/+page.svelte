@@ -38,19 +38,43 @@
 		'wrong_answer',
 		'other'
 	];
-	const actionOf = (waiting: Case) =>
-		waiting.kind === 'report'
-			? '?/decideReport'
-			: waiting.kind === 'appeal'
-				? '?/decideAppeal'
-				: '?/decideShare';
-	const fieldOf = (waiting: Case) => (waiting.kind === 'held_review' ? 'share' : waiting.kind);
+	const actions: Record<Case['kind'], string> = {
+		report: '?/decideReport',
+		appeal: '?/decideAppeal',
+		held_review: '?/decideShare',
+		held_comment: '?/decideComment',
+		comment_report: '?/decideCommentReport'
+	};
+	const fields: Record<Case['kind'], string> = {
+		report: 'report',
+		appeal: 'appeal',
+		held_review: 'share',
+		held_comment: 'comment',
+		comment_report: 'comment_report'
+	};
+	const actionOf = (waiting: Case) => actions[waiting.kind];
+	const fieldOf = (waiting: Case) => fields[waiting.kind];
 	const outcomesOf = (waiting: Case) =>
-		waiting.kind === 'report'
+		waiting.kind === 'report' || waiting.kind === 'comment_report'
 			? ['upheld', 'rejected']
 			: waiting.kind === 'appeal'
 				? ['maintained', 'reversed']
 				: ['published', 'refused'];
+	/** Whether the moderator names the rule the review's findings were about. */
+	const namesRule = (waiting: Case) =>
+		waiting.kind === 'held_review' || waiting.kind === 'held_comment';
+	const kindWord = (waiting: Case) =>
+		waiting.kind === 'report'
+			? m.moderation_report()
+			: waiting.kind === 'held_review'
+				? m.moderation_held_review()
+				: waiting.kind === 'held_comment'
+					? m.moderation_held_comment()
+					: waiting.kind === 'comment_report'
+						? m.moderation_comment_report()
+						: waiting.appellant === 'author'
+							? m.moderation_appeal_author()
+							: m.moderation_appeal_reporter();
 	const outcomeLabels: Record<string, () => string> = {
 		upheld: m.outcome_upheld,
 		rejected: m.outcome_rejected,
@@ -91,16 +115,8 @@
 				<Card.Root>
 					<Card.Header>
 						<Card.Description class="flex flex-wrap gap-2">
-							<Badge variant="secondary">
-								{waiting.kind === 'report'
-									? m.moderation_report()
-									: waiting.kind === 'held_review'
-										? m.moderation_held_review()
-										: waiting.appellant === 'author'
-											? m.moderation_appeal_author()
-											: m.moderation_appeal_reporter()}
-							</Badge>
-							{#if waiting.kind !== 'held_review'}
+							<Badge variant="secondary">{kindWord(waiting)}</Badge>
+							{#if waiting.kind !== 'held_review' && waiting.kind !== 'held_comment'}
 								<Badge variant="outline">{reasonWord(waiting.reason)}</Badge>
 							{/if}
 						</Card.Description>
@@ -147,6 +163,23 @@
 										2
 									)}</pre>
 							</details>
+						{:else if waiting.kind === 'held_comment' || waiting.kind === 'comment_report'}
+							<p>{m.moderation_comment_by({ pseudonym: waiting.pseudonym })}</p>
+							<blockquote class="border-l-2 pl-3 whitespace-pre-line">{waiting.text}</blockquote>
+							{#if waiting.kind === 'held_comment'}
+								<div>
+									<h3 class="font-medium">{m.moderation_findings()}</h3>
+									<p class="whitespace-pre-line">{waiting.findings}</p>
+								</div>
+							{:else}
+								{#if waiting.hidden}<p>{m.moderation_comment_hidden()}</p>{/if}
+								{#if waiting.details}
+									<div>
+										<h3 class="font-medium">{m.moderation_details()}</h3>
+										<p class="whitespace-pre-line">{waiting.details}</p>
+									</div>
+								{/if}
+							{/if}
 						{:else}
 							<div>
 								<p>
@@ -163,7 +196,7 @@
 								<p class="whitespace-pre-line">{waiting.statement}</p>
 							</div>
 						{/if}
-						{#if waiting.kind !== 'held_review'}
+						{#if waiting.kind === 'report' || waiting.kind === 'appeal'}
 							<p>
 								<a
 									href={href(`/moderation/items/${waiting.item}`)}
@@ -188,7 +221,7 @@
 									</label>
 								{/each}
 							</fieldset>
-							{#if waiting.kind === 'held_review'}
+							{#if namesRule(waiting)}
 								<label class="grid gap-1">
 									{m.moderation_held_reason()}
 									<select name="reason" required class="rounded-md border bg-transparent px-3 py-2">

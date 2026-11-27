@@ -52,7 +52,7 @@ pub fn router(library: Library) -> Router {
 type Answer = Result<Response, Refused>;
 
 /// A refusal: a fixed code, or the session's own (`signed_out`, `unavailable`).
-enum Refused {
+pub(crate) enum Refused {
     Code(StatusCode, &'static str),
     Session(Refusal),
 }
@@ -89,13 +89,16 @@ fn unavailable<E>(_: E) -> Refused {
 }
 
 /// The moderator a request comes from.
-struct Moderator {
-    subject: String,
-    now: Timestamp,
+pub(crate) struct Moderator {
+    pub(crate) subject: String,
+    pub(crate) now: Timestamp,
 }
 
 /// The moderator a request comes from, and the instant it is read at.
-async fn moderator(library: &Library, headers: &HeaderMap) -> Result<Moderator, Refused> {
+pub(crate) async fn moderator(
+    library: &Library,
+    headers: &HeaderMap,
+) -> Result<Moderator, Refused> {
     let (session, now) = signed_in(library, headers)
         .await
         .map_err(Refused::Session)?;
@@ -255,6 +258,31 @@ async fn case_json(library: &Library, case: &Case) -> Result<Value, sqlx::Error>
             "metadata": share.metadata,
             "content": share.content,
             "received_at": time(share.received_at),
+            "due_at": due_at,
+        }),
+        Case::HeldComment(comment) => json!({
+            "kind": "held_comment",
+            "comment": comment.comment,
+            "item": comment.item,
+            "title": super::title(&library.pool, &comment.item).await?,
+            "pseudonym": comment.pseudonym,
+            "text": comment.text,
+            "findings": comment.findings,
+            "received_at": time(comment.received_at),
+            "due_at": due_at,
+        }),
+        Case::CommentReport(report) => json!({
+            "kind": "comment_report",
+            "report": report.report,
+            "comment": report.comment,
+            "item": report.item,
+            "title": super::title(&library.pool, &report.item).await?,
+            "pseudonym": report.pseudonym,
+            "text": report.text,
+            "reason": report.reason.code(),
+            "details": report.details,
+            "hidden": report.hidden,
+            "received_at": time(report.received_at),
             "due_at": due_at,
         }),
     })

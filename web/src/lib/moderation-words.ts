@@ -33,7 +33,8 @@ const refusals: Record<string, () => string> = {
 	same_moderator: m.refused_same_moderator,
 	already_decided: m.refused_already_decided,
 	reason_required: m.refused_reason_required,
-	unknown_share: m.refused_other
+	unknown_share: m.refused_other,
+	unknown_comment: m.refused_other
 };
 
 export const reasonWord = (code: string) => (reasons[code] ?? m.reason_other)();
@@ -56,5 +57,7 @@ export const moment = (date: string) =>
 export function caseId(waiting: Case): string {
 	if (waiting.kind === 'report') return waiting.report;
 	if (waiting.kind === 'appeal') return waiting.appeal;
+	if (waiting.kind === 'held_comment') return waiting.comment;
+	if (waiting.kind === 'comment_report') return waiting.report;
 	return waiting.share;
 }

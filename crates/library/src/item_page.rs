@@ -85,6 +85,7 @@ async fn shown(pool: &PgPool, item: &str) -> Result<Option<Value>, sqlx::Error> 
             json!({"version": version, "published_at": time(published_at)})
         })
         .collect();
+    page["comments"] = crate::comments::shown(pool, item).await?;
     Ok(Some(page))
 }
 
