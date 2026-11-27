@@ -7,6 +7,7 @@ use sha2::{Digest, Sha256};
 use sqlx::{PgPool, Postgres, Transaction};
 
 use crate::contract::{Kind, SigningKey};
+use crate::media::{self, MediaStore};
 use crate::{Metadata, NewVersion};
 
 /// Why a version could not be published.
@@ -14,6 +15,17 @@ use crate::{Metadata, NewVersion};
 pub enum PublishError {
     /// The item identifier is not 32 lowercase hexadecimal digits.
     BadItem,
+    /// A picture or sound weighs more than [`crate::MEDIUM_LIMIT`].
+    MediumTooLarge {
+        digest: String,
+    },
+    /// The media of the version weigh more than [`crate::ITEM_MEDIA_LIMIT`] together.
+    MediaTooLarge,
+    /// A file that is no picture or sound of the bank format.
+    UnsupportedMedium {
+        digest: String,
+    },
+    Storage(std::io::Error),
     Database(sqlx::Error),
 }
 
@@ -49,12 +61,15 @@ fn metadata_json(metadata: &Metadata) -> Value {
 pub async fn publish(
     pool: &PgPool,
     signing: &SigningKey,
-    new: NewVersion,
+    media_store: &dyn MediaStore,
+    mut new: NewVersion,
     now: Timestamp,
 ) -> Result<u32, PublishError> {
     if !is_item_id(&new.item) {
         return Err(PublishError::BadItem);
     }
+    let media = media::prepare(std::mem::take(&mut new.media))?;
+    media::keep(media_store, &media).await?;
     let mut tx = pool.begin().await?;
     // One change of the catalogue at a time, so that documents follow it in order.
     sqlx::query("SELECT pg_advisory_xact_lock(1)")
@@ -84,6 +99,7 @@ pub async fn publish(
     .bind(now.as_second())
     .execute(&mut *tx)
     .await?;
+    media::record(&mut tx, &media).await?;
 
     let item = signing.sign(
         Kind::Item,
@@ -100,7 +116,7 @@ pub async fn publish(
             "metadata": metadata,
             "published_at": crate::contract::time(now),
             "content": new.content,
-            "media": [],
+            "media": media::listing(&media),
         }),
     );
     store(&mut tx, &item_path(&new.item, version), &item).await?;

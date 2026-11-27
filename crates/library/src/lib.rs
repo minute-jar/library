@@ -8,6 +8,7 @@ pub mod contract;
 
 mod catalogue;
 mod http;
+mod media;
 
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ use sqlx::PgPool;
 use crate::contract::SigningKey;
 
 pub use crate::catalogue::PublishError;
+pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
 
 /// A question bank or a learning path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,6 +86,8 @@ pub struct NewVersion {
     pub metadata: Metadata,
     /// The bank or learning path, in the bank format.
     pub content: Value,
+    /// The files of its pictures and sounds, which `content` names by digest.
+    pub media: Vec<Vec<u8>>,
 }
 
 /// The library service.
@@ -92,16 +96,18 @@ pub struct Library {
     pool: PgPool,
     signing: Arc<SigningKey>,
     keys_document: Arc<catalogue::Stored>,
+    media: Arc<dyn MediaStore>,
 }
 
 impl Library {
     /// The service over its database, which it brings up to date, signing
-    /// with `signing`, which `keys_document` certifies; the index is signed
-    /// again at `now`.
+    /// with `signing`, which `keys_document` certifies, keeping media in
+    /// `media`; the index is signed again at `now`.
     pub async fn open(
         pool: PgPool,
         signing: SigningKey,
         keys_document: String,
+        media: impl MediaStore,
         now: Timestamp,
     ) -> Result<Self, sqlx::Error> {
         sqlx::migrate!().run(&pool).await?;
@@ -110,6 +116,7 @@ impl Library {
             pool,
             signing: Arc::new(signing),
             keys_document: Arc::new(catalogue::Stored::new(keys_document)),
+            media: Arc::new(media),
         })
     }
 
@@ -119,7 +126,7 @@ impl Library {
         version: NewVersion,
         now: Timestamp,
     ) -> Result<u32, PublishError> {
-        catalogue::publish(&self.pool, &self.signing, version, now).await
+        catalogue::publish(&self.pool, &self.signing, &*self.media, version, now).await
     }
 
     /// Signs the index again at `now`, before it expires.

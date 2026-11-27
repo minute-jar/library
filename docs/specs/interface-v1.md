@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index and shared items. The withdrawal list, media, imports, ratings, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items and their media. The withdrawal list, imports, ratings, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
 
 ## Signed documents
 
@@ -112,16 +112,39 @@ A family server accepts another signed document only if its `key` is listed in a
   "metadata": {"language": "en-GB", "...": "as in the index"},
   "published_at": "2026-11-20T18:00:00Z",
   "content": {"...": "the bank or learning path in the bank format"},
-  "media": []
+  "media": [
+    {"digest": "<64 hex>", "type": "image/png", "size": 70}
+  ]
 }
 ```
 
 - `content` is in the bank format of the main repository; this version of the contract does not constrain it further.
 - A shared item does not expire: a version, once published, does not change. A withdrawal is announced by the withdrawal list.
+- `media` lists the pictures and sounds that `content` names, each once, ordered by `digest`; it is `[]` when there are none.
+
+## Media
+
+Pictures and sounds are not signed one by one (ADR-0004): a signed shared item lists each by its digest, and a family server checks every file it fetches against it.
+
+| Field | Meaning |
+|---|---|
+| `digest` | The SHA-256 of the file's bytes, 64 lowercase hexadecimal digits, as `content` names it in the bank format. |
+| `type` | The file's media type: `image/png`, `image/jpeg`, `image/gif` or `image/webp` for a picture, `audio/mpeg`, `audio/ogg` or `audio/wav` for a sound, as the bank format allows. |
+| `size` | The file's length in bytes. |
+
+`GET /v1/media/{digest}` answers the file's bytes, with `Content-Type` its `type`. The library refuses at publication:
+
+- a file over **1048576 bytes** (1 MiB), the bank format's limit for one picture or sound;
+- media of one version over **16777216 bytes** (16 MiB) together, the bank format's limit for the pictures and sounds of one bank;
+- a file that is none of the types above, recognised by its first bytes.
+
+A family server keeps a file only if its SHA-256 is the digest it asked for.
 
 ## HTTP
 
 - Every signed document is served as `application/json` with a strong `ETag`; a request whose `If-None-Match` names it answers `304 Not Modified` without a body.
 - `Cache-Control`: `public, max-age=3600` for keys, `public, max-age=300` for the index, `public, max-age=86400` for an item version.
+- A medium is served with `Cache-Control: public, max-age=31536000, immutable`, `X-Content-Type-Options: nosniff` and the strong `ETag` `"<digest>"`, with the same `304 Not Modified`: its address is its digest, so it never changes.
 - The bytes served are the same for every caller; nothing in a request changes them.
 - An unknown item answers `404` with `{"error": "unknown_item"}`, an unknown version of a known item `404` with `{"error": "unknown_version"}`.
+- A digest that no published version lists, or that is not 64 lowercase hexadecimal digits, answers `404` with `{"error": "unknown_media"}`.

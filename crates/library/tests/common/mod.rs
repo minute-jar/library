@@ -11,7 +11,7 @@ use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
 use jiff::Timestamp;
 use library::contract::{Keys, Kind, RootKey, SigningKey, verify_keys};
-use library::{Author, Curriculum, Library, Metadata, NewVersion};
+use library::{Author, Curriculum, Library, LocalDirectory, Metadata, NewVersion};
 use serde_json::{Value, json};
 use sqlx::postgres::PgPoolOptions;
 use testcontainers_modules::postgres::Postgres;
@@ -91,9 +91,19 @@ pub async fn library() -> Library {
         .connect(&format!("{server}/{name}"))
         .await
         .unwrap();
-    Library::open(pool, signing(), keys_document(), at("2026-11-26T00:00:00Z"))
-        .await
-        .unwrap()
+    let media = std::env::temp_dir()
+        .join("minute-jar-library-tests")
+        .join(&name);
+    let _ = std::fs::remove_dir_all(&media);
+    Library::open(
+        pool,
+        signing(),
+        keys_document(),
+        LocalDirectory::new(media),
+        at("2026-11-26T00:00:00Z"),
+    )
+    .await
+    .unwrap()
 }
 
 pub struct Answer {
@@ -178,6 +188,7 @@ pub fn verbs(title: &str) -> NewVersion {
             }),
         },
         content: json!({"questions": [{"type": "typed", "prompt": "Past of 'go'", "answers": ["went"]}]}),
+        media: vec![],
     }
 }
 
@@ -200,5 +211,14 @@ pub fn fractions() -> NewVersion {
             curriculum: None,
         },
         content: json!({"questions": []}),
+        media: vec![],
     }
 }
+
+/// A picture of one transparent pixel, a valid PNG file of 70 bytes.
+pub fn pixel() -> Vec<u8> {
+    hex::decode("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d4944415478da636460f85f0f0002870180eb47ba920000000049454e44ae426082").unwrap()
+}
+
+/// The SHA-256 digest of [`pixel`], worked out apart from the service.
+pub const PIXEL: &str = "497790947d4666760ce38f3c00e852c71fdb66cae849bae8e9ede352719e1581";
