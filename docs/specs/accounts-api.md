@@ -63,10 +63,11 @@ An account, as its owner sees it:
 `DELETE /api/account` closes the library account (story S12): `204`. Refusals, in this order: `403` `strong_sign_in_required` (as for opening), `404` `no_account`.
 
 - Every session of the Minute Jar account ends at once, on every device.
+- A card check it left unfinished ends at once (table `card_checks`).
 - The items it shared stay published under their licence, with its pseudonym: their signed versions do not change.
 - Its pseudonym stays reserved: no account may take it again, without regard to case.
 - The library account is no longer joined to the Minute Jar account, whose next sign-in finds no account and may open another, under another pseudonym.
-- Its identification data is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Sharing (ticket 12) records the last share in `identifications.last_shared_at`.
+- Its identification data, its identification and its verified card (`identification_cards`), is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Sharing (ticket 12) records the last share in `identifications.last_shared_at`.
 
 ## Card
 
@@ -86,6 +87,8 @@ A card, as its owner sees it:
   - `409` `card_verified`: the account's card is already verified.
 - `POST /api/account/card/check` (no body), once the browser is back, reads the check's result: `200` `{"card": <card>}` (also when the card was already verified). Refusals: `404` `no_card_check` (none started, or the last one was refused); `409` `card_check_pending` (not finished at the provider yet); `400` `card_refused` (the bank or the person refused it; it can be started again).
 - `GET /api/account/card` answers the card, or `404` `no_card` (or `no_account`).
+
+Once the account is closed, its sessions are ended (`401` `signed_out`) and a new sign-in finds no account: the card routes answer `404` `no_account`, as the other account routes do.
 
 Until the service is given a card verifier (`Library::with_cards`), these routes answer `503` `{"error": "unavailable"}`, as when the provider cannot be reached.
 

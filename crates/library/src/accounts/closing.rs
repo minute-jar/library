@@ -39,7 +39,8 @@ async fn close_route(
 }
 
 /// Closes the session's library account at `now`, which needs a recent
-/// strong sign-in, and ends every session of its Minute Jar account.
+/// strong sign-in, ends every session of its Minute Jar account and any
+/// card check it left unfinished.
 pub(crate) async fn close(
     pool: &PgPool,
     session: &Session,
@@ -49,17 +50,23 @@ pub(crate) async fn close(
         return Err(AccountError::StrongSignInRequired);
     }
     let mut transaction = pool.begin().await?;
-    let closed = sqlx::query(
+    let closed: Option<(i64,)> = sqlx::query_as(
         "UPDATE library_accounts SET subject = NULL, closed_at = $2
-         WHERE subject = $1",
+         WHERE subject = $1
+         RETURNING id",
     )
     .bind(&session.subject)
     .bind(sqlx_time(now))
-    .execute(&mut *transaction)
+    .fetch_optional(&mut *transaction)
     .await?;
-    if closed.rows_affected() == 0 {
+    let Some((account,)) = closed else {
         return Err(AccountError::NoAccount);
-    }
+    };
+    // A card check left unfinished is no identification: it ends at once.
+    sqlx::query("DELETE FROM card_checks WHERE account = $1")
+        .bind(account)
+        .execute(&mut *transaction)
+        .await?;
     sqlx::query("DELETE FROM sessions WHERE subject = $1")
         .bind(&session.subject)
         .execute(&mut *transaction)
@@ -69,23 +76,33 @@ pub(crate) async fn close(
 }
 
 /// Erases at `now` the identification data of closed accounts whose last
-/// share is older than `kept_for`, and of those that never shared.
+/// share is older than `kept_for`, and of those that never shared: their
+/// identification and their verified card.
 pub(crate) async fn erase_identifications(
     pool: &PgPool,
     now: Timestamp,
     kept_for: SignedDuration,
 ) -> Result<(), sqlx::Error> {
     let limit = now.checked_sub(kept_for).expect("a past instant");
-    sqlx::query(
+    let mut transaction = pool.begin().await?;
+    let erased: Vec<(i64,)> = sqlx::query_as(
         "DELETE FROM identifications AS identification
          USING library_accounts AS account
          WHERE account.id = identification.account
            AND account.closed_at IS NOT NULL
            AND (identification.last_shared_at IS NULL
-                OR identification.last_shared_at <= $1)",
+                OR identification.last_shared_at <= $1)
+         RETURNING identification.account",
     )
     .bind(sqlx_time(limit))
-    .execute(pool)
+    .fetch_all(&mut *transaction)
     .await?;
+    // The verified card is identification data too, erased with it.
+    let accounts: Vec<i64> = erased.into_iter().map(|(account,)| account).collect();
+    sqlx::query("DELETE FROM identification_cards WHERE account = ANY($1)")
+        .bind(&accounts)
+        .execute(&mut *transaction)
+        .await?;
+    transaction.commit().await?;
     Ok(())
 }

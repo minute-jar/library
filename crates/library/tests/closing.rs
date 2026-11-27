@@ -254,3 +254,76 @@ async fn the_retention_period_is_set_by_the_caller() {
 
     assert!(tables_holding(&database, EMAIL).await.is_empty());
 }
+
+#[tokio::test]
+async fn closing_ends_a_pending_card_check() {
+    let (library, provider, clock, _, database) = common::cards::with_cards().await;
+    let session =
+        common::cards::account(&library, &provider, &clock, SUBJECT, "Owl", "separate").await;
+    let started = common::cards::verify_card(&library, &session).await;
+    assert_eq!(started.status, StatusCode::ACCEPTED);
+
+    close(&library, &session).await;
+
+    assert!(tables_holding(&database, "seti_1").await.is_empty());
+}
+
+#[tokio::test]
+async fn the_card_of_a_closed_account_is_kept_and_erased_with_its_identification() {
+    let (library, provider, clock, payments, database) = common::cards::with_cards().await;
+    let session =
+        common::cards::account(&library, &provider, &clock, SUBJECT, "Owl", "separate").await;
+    common::cards::verify_card(&library, &session).await;
+    payments.verify("seti_1", common::cards::FINGERPRINT);
+    common::cards::finish_check(&library, &session).await;
+    shared(&database, "Owl", at("2026-11-27T10:05:00Z")).await;
+    close(&library, &session).await;
+
+    library
+        .erase_identifications(
+            at("2027-11-27T10:04:59Z"),
+            library::IDENTIFICATION_RETENTION,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        tables_holding(&database, common::cards::FINGERPRINT).await,
+        ["identification_cards"]
+    );
+
+    library
+        .erase_identifications(
+            at("2027-11-27T10:05:00Z"),
+            library::IDENTIFICATION_RETENTION,
+        )
+        .await
+        .unwrap();
+    assert!(
+        tables_holding(&database, common::cards::FINGERPRINT)
+            .await
+            .is_empty()
+    );
+    assert!(tables_holding(&database, EMAIL).await.is_empty());
+}
+
+#[tokio::test]
+async fn the_card_routes_refuse_a_closed_account() {
+    let (library, provider, clock, _, _) = common::cards::with_cards().await;
+    let first =
+        common::cards::account(&library, &provider, &clock, SUBJECT, "Owl", "separate").await;
+    close(&library, &first).await;
+    let again = session(&library, &provider, passkey(SUBJECT, clock.now())).await;
+
+    for (method, path) in [
+        ("GET", "/api/account/card"),
+        ("POST", "/api/account/card"),
+        ("POST", "/api/account/card/check"),
+    ] {
+        let by_old = with_session(&library, method, path, &first, None).await;
+        assert_eq!(by_old.status, StatusCode::UNAUTHORIZED, "{method} {path}");
+        assert_eq!(by_old.json(), json!({"error": "signed_out"}));
+        let by_new = with_session(&library, method, path, &again, None).await;
+        assert_eq!(by_new.status, StatusCode::NOT_FOUND, "{method} {path}");
+        assert_eq!(by_new.json(), json!({"error": "no_account"}));
+    }
+}

@@ -99,7 +99,8 @@ fn assert_keeps_secrets(answer: &Answer, what: &str) {
 
 #[tokio::test]
 async fn no_route_answers_the_e_mail_or_the_minute_jar_account() {
-    let (library, provider, _) = with_accounts().await;
+    // With cards on, so that the card routes answer as in deployment.
+    let (library, provider, _, _, _) = common::cards::with_cards().await;
     library
         .publish_version(
             library::NewVersion {
