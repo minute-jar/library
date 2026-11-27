@@ -2,11 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { SESSION_COOKIE } from '#lib/server/accounts.ts';
 import { fakeAccounts, fakeCookies } from '#lib/server/testing/fake-accounts.ts';
 import { TERMS, fakeShares } from '#lib/server/testing/fake-shares.ts';
-import type { Share } from '#lib/server/shares.ts';
+import type { AuthorNotification, Share } from '#lib/server/shares.ts';
 import { actions, load } from './+page.server.ts';
 
 type LoadEvent = Parameters<typeof load>[0];
 type ActionEvent = Parameters<typeof actions.accept>[0];
+type AppealEvent = Parameters<typeof actions.appeal>[0];
 
 const owl = {
 	pseudonym: 'Owl',
@@ -70,7 +71,8 @@ describe('the sharing page', () => {
 		expect(data).toEqual({
 			sharing_terms: { current: TERMS, accepted: null },
 			quota: { shares_per_day: 10, shared_today: 0, next_share_at: null },
-			shares: []
+			shares: [],
+			notifications: []
 		});
 	});
 
@@ -124,6 +126,38 @@ describe('the sharing page', () => {
 			shared_today: 10,
 			next_share_at: '2026-11-28T00:00:00Z'
 		});
+	});
+
+	it('tells the author of decisions on their items and takes their appeal', async () => {
+		const api = setUp();
+		const session = api.accounts.signedIn('subject-1', owl);
+		const told: AuthorNotification = {
+			item: '0123456789abcdef0123456789abcdef',
+			title: 'Irregular verbs',
+			report: '22222222222222222222222222222222',
+			reason: 'other',
+			details: 'Question 1',
+			decision: { outcome: 'upheld', reasons: 'Off topic.' },
+			appeal: null,
+			at: '2026-11-27T10:00:00Z'
+		};
+		api.shares.notifications.set('subject-1', [told]);
+
+		const data = await load(event(api, session) as unknown as LoadEvent);
+		const empty = await actions.appeal(
+			event(api, session, { report: told.report, statement: ' ' }) as unknown as AppealEvent
+		);
+		const appealed = await actions.appeal(
+			event(api, session, {
+				report: told.report,
+				statement: 'Every question is about verbs.'
+			}) as unknown as AppealEvent
+		);
+
+		expect(data.notifications).toEqual([told]);
+		expect(empty).toMatchObject({ status: 400, data: { refused: 'statement_required' } });
+		expect(appealed).toEqual({ appealed: told.report });
+		expect(api.shares.appeals.get(told.report)).toBe('Every question is about verbs.');
 	});
 
 	it('sends back to the account page without a library account or a session', async () => {

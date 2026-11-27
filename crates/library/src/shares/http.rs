@@ -5,7 +5,7 @@
 
 use axum::Router;
 use axum::body::Bytes;
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
@@ -13,10 +13,11 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::{Desk, Prepared, SHARES_PER_DAY, SHARING_TERMS, Share, ShareOutcome, ShareRefusal};
-use crate::Library;
 use crate::accounts::Session;
 use crate::accounts::http::{Refusal, signed_in};
 use crate::contract::time;
+use crate::moderation::{Appeal, AppealError, Appellant};
+use crate::{Library, Outcome};
 
 pub fn router(library: Library) -> Router {
     Router::new()
@@ -24,6 +25,8 @@ pub fn router(library: Library) -> Router {
         .route("/api/account/shares", get(shares))
         .route("/api/sharing-terms", get(terms))
         .route("/api/account/sharing-terms", put(accept))
+        .route("/api/account/notifications", get(notifications))
+        .route("/api/account/reports/{report}/appeal", post(appeal))
         .with_state(library)
 }
 
@@ -202,6 +205,84 @@ async fn accept(State(library): State<Library>, headers: HeaderMap, request: Byt
         StatusCode::OK,
         json!({"current": SHARING_TERMS, "accepted": SHARING_TERMS}),
     ))
+}
+
+/// What the author of the session's items must be told about reports on
+/// them and their decisions, oldest first.
+async fn notifications(State(library): State<Library>, headers: HeaderMap) -> Answer {
+    let (session, _, _) = signed_in_to_share(&library, &headers).await?;
+    let mut told = Vec::new();
+    for (item, title) in super::authored(&library.pool, &session).await? {
+        for notification in library.author_notifications(&item).await? {
+            told.push((
+                notification.at,
+                json!({
+                    "item": item,
+                    "title": title,
+                    "report": notification.report,
+                    "reason": notification.reason.code(),
+                    "details": notification.details,
+                    "decision": notification.decision.map(|decision| json!({
+                        "outcome": match decision.outcome {
+                            Outcome::Upheld => "upheld",
+                            Outcome::Rejected => "rejected",
+                        },
+                        "reasons": decision.reasons,
+                    })),
+                    "appeal": notification.appeal.map(|appeal| json!({
+                        "outcome": appeal.outcome.code(),
+                        "reasons": appeal.reasons,
+                    })),
+                    "at": time(notification.at),
+                }),
+            ));
+        }
+    }
+    told.sort_by_key(|(at, _)| *at);
+    let told: Vec<Value> = told
+        .into_iter()
+        .map(|(_, notification)| notification)
+        .collect();
+    Ok(answer(StatusCode::OK, json!({"notifications": told})))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AuthorsAppeal {
+    statement: String,
+}
+
+/// The author's appeal of a decision on a report of one of their items.
+async fn appeal(
+    State(library): State<Library>,
+    Path(report): Path<String>,
+    headers: HeaderMap,
+    request: Bytes,
+) -> Answer {
+    let (session, now, _) = signed_in_to_share(&library, &headers).await?;
+    let asked: AuthorsAppeal = serde_json::from_slice(&request).map_err(|_| BAD_REQUEST)?;
+    const UNKNOWN_REPORT: Refused = Refused::Fixed(StatusCode::NOT_FOUND, "unknown_report");
+    if !super::is_authors_report(&library.pool, &session, &report).await? {
+        return Err(UNKNOWN_REPORT);
+    }
+    let appeal = Appeal {
+        appellant: Appellant::Author,
+        statement: asked.statement,
+        contact: None,
+    };
+    let fixed = |status, code| Err(Refused::Fixed(status, code));
+    match library.appeal(&report, appeal, now).await {
+        Ok(appeal) => Ok(answer(StatusCode::ACCEPTED, json!({"appeal": appeal}))),
+        Err(AppealError::UnknownReport) => Err(UNKNOWN_REPORT),
+        Err(AppealError::NotDecided) => fixed(StatusCode::CONFLICT, "not_decided"),
+        Err(AppealError::TooLate) => fixed(StatusCode::CONFLICT, "too_late"),
+        Err(AppealError::AlreadyAppealed) => fixed(StatusCode::CONFLICT, "already_appealed"),
+        Err(AppealError::StatementRequired) => fixed(StatusCode::BAD_REQUEST, "statement_required"),
+        Err(AppealError::StatementTooLong | AppealError::BadContact) => Err(BAD_REQUEST),
+        Err(AppealError::Unavailable | AppealError::Database(_)) => {
+            Err(Refused::Share(ShareRefusal::Unavailable))
+        }
+    }
 }
 
 fn answer(status: StatusCode, body: Value) -> Response {

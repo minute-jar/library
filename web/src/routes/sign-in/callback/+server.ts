@@ -8,7 +8,7 @@ import { SESSION_COOKIE, SIGN_IN_COOKIE, accounts } from '#lib/server/accounts.t
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url, fetch, cookies }) => {
-	const [state, language] = (cookies.get(SIGN_IN_COOKIE) ?? '').split('.');
+	const [state, language, back] = (cookies.get(SIGN_IN_COOKIE) ?? '').split('.');
 	const locale: Locale = isLocale(language) ? language : 'en';
 	cookies.delete(SIGN_IN_COOKIE, { path: '/' });
 	const code = url.searchParams.get('code');
@@ -28,5 +28,5 @@ export const GET: RequestHandler = async ({ url, fetch, cookies }) => {
 		expires: new Date(session.expires_at),
 		secure: url.protocol === 'https:'
 	});
-	redirect(303, localizeHref('/account', { locale }));
+	redirect(303, localizeHref(back === 'moderation' ? '/moderation' : '/account', { locale }));
 };

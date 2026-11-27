@@ -82,6 +82,18 @@ _Avoid_: Flag, complaint, ticket, abuse report
 The state of a shared item that no child of any family may use, until a moderator's decision, because a report of a child's personal data or illegal content was found plausible.
 _Avoid_: Takedown, ban, quarantine, block
 
+**Moderator** (FR: Modérateur):
+A member of the operator's team whom the operator named, who decides reports and appeals after signing in with a passkey.
+_Avoid_: Admin, reviewer, staff
+
+**Appeal** (FR: Recours):
+The request of an item's author or of a reporter, within six months of a moderator's decision, that another moderator decide again.
+_Avoid_: Complaint, dispute, contest
+
+**Decisions Log** (FR: Registre des décisions):
+Every moderator's decision with its reasons, from which the yearly transparency report counts decisions by reason and outcome.
+_Avoid_: Audit log, moderation log, history
+
 **Withdrawal** (FR: Retrait):
 The end of a shared item's presence in the catalogue, by its author's choice or by a moderation decision.
 _Avoid_: Deletion, removal, unpublish

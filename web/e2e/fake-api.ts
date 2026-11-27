@@ -1,4 +1,4 @@
-// The catalogue, accounts and sharing APIs' answers for the smoke tests, on
+// The catalogue, accounts, sharing and moderation APIs' answers for the smoke tests, on
 // 127.0.0.1:4174, a fake identity provider at `/authorize` that signs in
 // at once and sends the browser back to the website's callback page, and a
 // fake payment provider at `/setup/<check>` that verifies the card at once
@@ -9,12 +9,16 @@ import { fakeApi } from '../src/lib/server/testing/fake-api.ts';
 import { fakeAccounts } from '../src/lib/server/testing/fake-accounts.ts';
 import { fakeCards } from '../src/lib/server/testing/fake-cards.ts';
 import { fakeShares } from '../src/lib/server/testing/fake-shares.ts';
+import { fakeModeration } from '../src/lib/server/testing/fake-moderation.ts';
 
 const root = 'http://127.0.0.1:4174';
 const api = fakeApi();
 const accounts = fakeAccounts(root);
 const cards = fakeCards(accounts, root);
 const shares = fakeShares(accounts);
+const moderation = fakeModeration(accounts);
+// Whoever signs in moderates: the operator's naming is the service's concern.
+moderation.anyoneModerates = true;
 
 createServer((request, response) => {
 	const url = new URL(request.url ?? '/', root);
@@ -44,6 +48,7 @@ createServer((request, response) => {
 		void (
 			shares.fetch(asked) ??
 			cards.fetch(asked) ??
+			moderation.fetch(asked) ??
 			accounts.fetch(asked) ??
 			api.fetch(asked)
 		).then(async (answer) => {

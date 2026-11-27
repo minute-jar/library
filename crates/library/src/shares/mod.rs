@@ -13,6 +13,7 @@
 //! (table `authored_items`), so that the author hears of reports and
 //! decisions and may appeal them.
 
+pub(crate) mod held;
 pub(crate) mod http;
 
 use jiff::Timestamp;
@@ -553,4 +554,42 @@ pub(crate) async fn standing(
 /// The instant the next share is possible, when the quota is reached at `now`.
 pub(crate) fn next_share_at(shared_today: u32, now: Timestamp) -> Option<Timestamp> {
     (shared_today >= SHARES_PER_DAY).then(|| next_day(now))
+}
+
+/// Whether the report `report` is about an item of the session's account.
+pub(crate) async fn is_authors_report(
+    pool: &PgPool,
+    session: &Session,
+    report: &str,
+) -> Result<bool, sqlx::Error> {
+    let (theirs,): (bool,) = sqlx::query_as(
+        "SELECT EXISTS (
+             SELECT 1 FROM reports AS r
+             JOIN authored_items AS i ON i.item = r.item
+             JOIN library_accounts AS a ON a.id = i.account
+             WHERE r.id = $1 AND a.subject = $2)",
+    )
+    .bind(report)
+    .bind(&session.subject)
+    .fetch_one(pool)
+    .await?;
+    Ok(theirs)
+}
+
+/// The published items of the session's account, with their latest title.
+pub(crate) async fn authored(
+    pool: &PgPool,
+    session: &Session,
+) -> Result<Vec<(String, String)>, sqlx::Error> {
+    sqlx::query_as(
+        "SELECT DISTINCT ON (i.item) i.item, v.title
+         FROM authored_items AS i
+         JOIN library_accounts AS a ON a.id = i.account
+         JOIN item_versions AS v ON v.item = i.item
+         WHERE a.subject = $1
+         ORDER BY i.item, v.version DESC",
+    )
+    .bind(&session.subject)
+    .fetch_all(pool)
+    .await
 }

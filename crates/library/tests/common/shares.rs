@@ -7,7 +7,9 @@ use std::io;
 use std::sync::{Arc, Mutex};
 
 use axum::http::StatusCode;
-use library::{Library, ReviewFuture, ReviewOutcome, Reviewer, Submission};
+use library::{
+    Library, Message, Notifier, NotifyFuture, ReviewFuture, ReviewOutcome, Reviewer, Submission,
+};
 use serde_json::{Value, json};
 
 use super::Answer;
@@ -75,11 +77,33 @@ pub struct Sharing {
     pub database: String,
 }
 
-/// A library with accounts, cards and sharing, over fakes.
+/// The review of reports, which finds nothing.
+struct FindingNothing;
+
+impl Reviewer for FindingNothing {
+    fn review<'a>(&'a self, _: Submission<'a>) -> ReviewFuture<'a> {
+        Box::pin(async { Ok(ReviewOutcome::Published) })
+    }
+}
+
+/// A notifier that sends nothing.
+struct Silent;
+
+impl Notifier for Silent {
+    fn send<'a>(&'a self, _: &'a str, _: &'a Message) -> NotifyFuture<'a> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+/// A library with accounts, cards, sharing and reports, over fakes.
 pub async fn with_sharing() -> Sharing {
     let (library, provider, clock, payments, database) = with_cards().await;
     let reviewer = FakeReviewer::default();
-    let library = library.with_sharing(reviewer.clone());
+    let reading = clock.clone();
+    let library =
+        library
+            .with_sharing(reviewer.clone())
+            .with_reports(FindingNothing, Silent, move || reading.now());
     Sharing {
         library,
         provider,

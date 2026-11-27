@@ -2,7 +2,7 @@
 // accounts: a test sets the shares each account made.
 
 import type { FakeAccounts } from './fake-accounts.ts';
-import type { Share } from '../shares.ts';
+import type { AuthorNotification, Share } from '../shares.ts';
 
 export const TERMS = '2026-11';
 export const SHARES_PER_DAY = 10;
@@ -16,6 +16,10 @@ export type FakeShares = {
 	shares: Map<string, Share[]>;
 	/** How many shares each Minute Jar account made today. */
 	today: Map<string, number>;
+	/** What each Minute Jar account's items' author must be told. */
+	notifications: Map<string, AuthorNotification[]>;
+	/** The appeals received, by report, with their statement. */
+	appeals: Map<string, string>;
 };
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
@@ -34,6 +38,22 @@ export function fakeShares(accounts: FakeAccounts): FakeShares {
 			if (version !== TERMS) return refused(409, 'outdated_sharing_terms');
 			fake.accepted.set(subject, version);
 			return json({ current: TERMS, accepted: TERMS });
+		}
+		if (pathname === '/api/account/notifications' && request.method === 'GET') {
+			return json({ notifications: fake.notifications.get(subject) ?? [] });
+		}
+		const appealed = pathname.match(/^\/api\/account\/reports\/([^/]+)\/appeal$/);
+		if (appealed && request.method === 'POST') {
+			const report = appealed[1];
+			const theirs = (fake.notifications.get(subject) ?? []).some(
+				(told) => told.report === report && told.decision
+			);
+			if (!theirs) return refused(404, 'unknown_report');
+			if (fake.appeals.has(report)) return refused(409, 'already_appealed');
+			const { statement } = (await request.json()) as { statement: string };
+			if (!statement.trim()) return refused(400, 'statement_required');
+			fake.appeals.set(report, statement);
+			return json({ appeal: `appeal-of-${report}` }, 202);
 		}
 		if (pathname === '/api/account/shares' && request.method === 'GET') {
 			const today = fake.today.get(subject) ?? 0;
@@ -54,9 +74,15 @@ export function fakeShares(accounts: FakeAccounts): FakeShares {
 		accepted: new Map(),
 		shares: new Map(),
 		today: new Map(),
+		notifications: new Map(),
+		appeals: new Map(),
 		fetch(request) {
 			const { pathname } = new URL(request.url);
-			const ours = pathname === '/api/account/shares' || pathname === '/api/account/sharing-terms';
+			const ours =
+				pathname === '/api/account/shares' ||
+				pathname === '/api/account/sharing-terms' ||
+				pathname === '/api/account/notifications' ||
+				pathname.startsWith('/api/account/reports/');
 			return ours ? answer(request) : null;
 		}
 	};

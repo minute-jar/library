@@ -33,6 +33,20 @@ export type Standing = {
 	shares: Share[];
 };
 
+/** What the author must be told about a report on one of their items. */
+export type AuthorNotification = {
+	item: string;
+	title: string;
+	report: string;
+	reason: string;
+	details: string | null;
+	/** Null for a report to answer by a new version; the decision otherwise. */
+	decision: { outcome: 'upheld' | 'rejected'; reasons: string } | null;
+	/** An appeal's decision, from the author or the reporter. */
+	appeal: { outcome: 'maintained' | 'reversed'; reasons: string } | null;
+	at: string;
+};
+
 export function shares(fetch: typeof globalThis.fetch, root: string = LIBRARY_API) {
 	async function call<T>(method: string, path: string, session: string, body?: unknown) {
 		const headers: Record<string, string> = { authorization: `Bearer ${session}` };
@@ -57,6 +71,24 @@ export function shares(fetch: typeof globalThis.fetch, root: string = LIBRARY_AP
 	return {
 		standing(session: string) {
 			return call<Standing>('GET', '/api/account/shares', session);
+		},
+		async notifications(session: string) {
+			return (
+				await call<{ notifications: AuthorNotification[] }>(
+					'GET',
+					'/api/account/notifications',
+					session
+				)
+			).notifications;
+		},
+		/** The author's appeal of the decision on a report of their item. */
+		appeal(session: string, report: string, statement: string) {
+			return call<{ appeal: string }>(
+				'POST',
+				`/api/account/reports/${encodeURIComponent(report)}/appeal`,
+				session,
+				{ statement }
+			);
 		},
 		/** Accepts the sharing terms of `version`, the ones the page showed. */
 		accept(session: string, version: string) {

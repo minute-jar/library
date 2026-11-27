@@ -290,6 +290,38 @@ Content-Type: application/json
 - A moderator's decision that upholds a report withdraws the item (`kind` `moderation`, with the report's reason); one that rejects it ends the switch-off or the hiding once no other report for the same reasons waits.
 - Refusals: a malformed identifier `400 {"error": "bad_library_identifier"}`; an unknown reason `400 {"error": "bad_reason"}`; a contact that is not an e-mail address `400 {"error": "bad_contact"}`; a notice without a name, a work or a contact, or for another reason than `rights`, `400 {"error": "bad_notice"}`; a body that is not the expected object, or details too long, `400 {"error": "bad_request"}`; an unknown item `404 {"error": "unknown_item"}`; an unknown report `404 {"error": "unknown_report"}`.
 
+### Appeals
+
+The reporter of a decided report may appeal the decision within six months, once; another moderator than the one who decided looks again (`moderation-api.md`). Knowing the report's identifier is what makes the reporter.
+
+```
+POST /v1/reports/{report}/appeal
+Content-Type: application/json
+
+{"statement": "Page 12 of English Grammar, Year 5."}
+```
+
+```
+POST /api/reports/{report}/appeal
+Content-Type: application/json
+
+{"statement": "...", "contact": "reporter@example.org"}
+```
+
+- A family server's appeal carries only `statement` (at most 2000 characters); the website's may add `contact`, kept only until the appeal's decision is sent.
+- The answer is `202 Accepted` with `{"appeal": "<32 hex>"}` and `Cache-Control: no-store`.
+- `GET /v1/appeals/{appeal}` answers where it stands, with `Cache-Control: no-store`:
+
+  ```json
+  {"appeal": "<32 hex>", "report": "<32 hex>", "status": "reversed",
+   "received_at": "2026-11-27T10:01:00Z",
+   "decision": {"outcome": "reversed", "reasons": "...", "decided_at": "2026-11-27T11:00:00Z"}}
+  ```
+
+  `status` is `waiting`, `maintained` or `reversed`; `decision` is `null` until decided. A reversal also changes the report: `GET /v1/reports/{report}` then answers the new status (`upheld` or `rejected`) with the appeal's reasons, and the withdrawal list follows it.
+- Refusals: an empty statement `400 {"error": "statement_required"}`; a contact that is not an e-mail address `400 {"error": "bad_contact"}`; a body that is not the expected object (a family server's `contact` among others), or a statement too long, `400 {"error": "bad_request"}`; an unknown report `404 {"error": "unknown_report"}`; a report not decided yet, or closed by its author's correction, `409 {"error": "not_decided"}`; more than six months after the decision `409 {"error": "too_late"}`; a second appeal of the same report `409 {"error": "already_appealed"}`; an unknown appeal `404 {"error": "unknown_appeal"}`.
+- The author appeals through their library account: `POST /api/account/reports/{report}/appeal` with the session and `{"statement"}` answers `202 {"appeal"}`, with `Cache-Control: private, no-store`, for a report of one of the account's items, with the same refusals; a report of another account's item answers `404 unknown_report`. The author reads what they must be told about reports on their items, and the decisions with their reasons, at `GET /api/account/notifications` (`interface-v1.md`, Shares).
+
 ## Shares
 
 A parent shares a bank or a learning path from the parent app, under their library account (stories S10, S13, S16). The family server prepares the item (recorded sound removed, picture metadata erased, the family's names searched for; main repository, sharing preparation), and the parent app sends it with the library account's **session** (`accounts-api.md`), never with the family server's library identifier. It is the one call of this contract that carries a session, so it lives under `/api/`, beside sign-in, and every `POST` under `/v1/` stays anonymous.
@@ -335,6 +367,8 @@ Content-Type: application/json
    "shares": [<share>, ...]}
   ```
 - Refusals, in this order: a body carrying `library_identifier` `400 {"error": "library_identifier_not_allowed"}` (nothing is read further, nothing kept); `503 unavailable` until the service is given a reviewer; `401 signed_out`; a body that is not the expected object `400 bad_request`; `403 strong_sign_in_required` (a recent strong sign-in, as for opening an account); `404 no_account`; `403 card_required` (the account's card is not verified, `accounts-api.md`, Card); `403 sharing_terms_required`; `400 bad_item` (title or metadata); `400 bad_content` (not in the bank format); `400 medium_too_large`, `media_too_large` or `unsupported_medium` (see Media); `429 share_quota_reached`; `503 unavailable` when the review cannot be reached.
+- A held share waits in the moderation queue (`moderation-api.md`, `held_review`) until a moderator publishes it, under the account's pseudonym of that moment, or refuses it; `GET /api/account/shares` then answers its new outcome.
+- `GET /api/account/notifications`, with the session, answers what the author must be told about reports on their published items, oldest first: `{"notifications": [{"item", "title", "report", "reason", "details", "decision": null | {"outcome": "upheld" | "rejected", "reasons"}, "appeal": null | {"outcome": "maintained" | "reversed", "reasons"}, "at"}]}`. `decision` is `null` for a wrong answer or unsuitable content to correct within 7 days. The author may appeal a decision (see Appeals).
 - Every share, whatever its outcome, is written to the account's sharing log, identification data kept for the legal period after the last share (`accounts-api.md`, Closing). Each shared item is joined to the account that answers for it, so that its author hears of reports and decisions and may appeal them.
 
 ## HTTP

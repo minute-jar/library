@@ -87,6 +87,34 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             Some(common::shares::prepared("Irregular verbs, part 2")),
         ),
         ("GET", "/api/account/shares".into(), None),
+        ("GET", "/api/moderation/queue".into(), None),
+        ("GET", format!("/api/moderation/items/{VERBS}"), None),
+        ("GET", "/api/moderation/figures/2026".into(), None),
+        (
+            "POST",
+            "/api/moderation/reports/00000000000000000000000000000000/decision".into(),
+            Some(json!({"outcome": "rejected", "reasons": "Nothing wrong."})),
+        ),
+        (
+            "POST",
+            "/api/moderation/appeals/00000000000000000000000000000000/decision".into(),
+            Some(json!({"outcome": "maintained", "reasons": "It stands."})),
+        ),
+        (
+            "POST",
+            "/v1/reports/00000000000000000000000000000000/appeal".into(),
+            Some(json!({"statement": "Please look again."})),
+        ),
+        (
+            "POST",
+            "/api/reports/00000000000000000000000000000000/appeal".into(),
+            Some(json!({"statement": "Please look again."})),
+        ),
+        (
+            "GET",
+            "/v1/appeals/00000000000000000000000000000000".into(),
+            None,
+        ),
         // Closing ends the session: last but one.
         ("DELETE", "/api/account".into(), None),
         ("DELETE", "/api/session".into(), None),
@@ -125,6 +153,11 @@ async fn no_route_answers_the_e_mail_or_the_minute_jar_account() {
         .await
         .unwrap();
     import(&library, FAMILY_A, VERBS).await;
+    // A moderator too, so that the moderation routes answer what they hold.
+    library
+        .grant_moderator(SUBJECT, "Owl", signed_in_at())
+        .await
+        .unwrap();
     let callback = sign_in_with(&library, &provider, passkey(SUBJECT, signed_in_at())).await;
     assert_keeps_secrets(&callback, "the sign-in's callback");
     let session = callback.json()["session"].as_str().unwrap().to_string();

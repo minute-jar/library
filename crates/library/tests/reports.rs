@@ -18,6 +18,9 @@ use library::{
 };
 use serde_json::{Value, json};
 
+/// The Minute Jar account of the moderator who decides.
+const MODERATOR: &str = "moderator-subject";
+
 /// The instant every report in these tests arrives at, unless said otherwise.
 fn received() -> Timestamp {
     at("2026-11-26T10:00:00Z")
@@ -105,6 +108,10 @@ async fn moderated_with(outcome: Option<ReviewOutcome>) -> Moderated {
         .unwrap();
     library
         .publish_version(fractions(), at("2026-11-21T08:00:00Z"))
+        .await
+        .unwrap();
+    library
+        .grant_moderator(MODERATOR, "Moderator", received())
         .await
         .unwrap();
     // Signed again before the reports arrive, so that it is current when checked.
@@ -424,7 +431,7 @@ async fn a_rejected_report_puts_the_switched_off_item_back_by_itself() {
     };
     moderated
         .library
-        .decide_report(&id, decision.clone(), at("2026-11-27T10:00:00Z"))
+        .decide_report(MODERATOR, &id, decision.clone(), at("2026-11-27T10:00:00Z"))
         .await
         .unwrap();
 
@@ -455,7 +462,7 @@ async fn a_rejected_report_puts_the_switched_off_item_back_by_itself() {
     assert!(matches!(
         moderated
             .library
-            .decide_report(&id, decision, at("2026-11-27T11:00:00Z"))
+            .decide_report(MODERATOR, &id, decision, at("2026-11-27T11:00:00Z"))
             .await,
         Err(library::DecideError::AlreadyDecided)
     ));
@@ -469,6 +476,7 @@ async fn a_rejected_report_shows_a_hidden_item_again() {
     moderated
         .library
         .decide_report(
+            MODERATOR,
             &id,
             Decision {
                 outcome: Outcome::Rejected,
@@ -502,6 +510,7 @@ async fn an_upheld_report_withdraws_the_item_by_moderation() {
     moderated
         .library
         .decide_report(
+            MODERATOR,
             &id,
             Decision {
                 outcome: Outcome::Upheld,

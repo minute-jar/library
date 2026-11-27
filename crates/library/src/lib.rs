@@ -16,6 +16,7 @@ mod http;
 mod imports;
 mod item_page;
 mod media;
+mod moderation;
 mod ratings;
 mod reports;
 mod review;
@@ -43,6 +44,11 @@ pub use crate::cards::{
 pub use crate::catalogue::PublishError;
 pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
+pub use crate::moderation::{
+    APPEAL_PERIOD, Appeal, AppealDecision, AppealError, AppealOutcome, AppealState, AppealStatus,
+    Appellant, Case, DECISION_TARGET, Event, Figures, History, HistoryEntry, ModeratorError,
+    QueuedAppeal, STATEMENT_LIMIT,
+};
 pub use crate::ratings::{ItemRatings, REVIEW_LENGTH, RatingError, Review};
 pub use crate::reports::{
     AuthorNotification, DETAILS_LIMIT, DecideError, Decision, Effect, FormalNotice, Message,
@@ -50,6 +56,7 @@ pub use crate::reports::{
     ReportStatus, Reporter,
 };
 pub use crate::review::{RefusalReason, ReviewFuture, ReviewOutcome, Reviewer, Submission};
+pub use crate::shares::held::{HeldDecision, HeldDecisionError, HeldOutcome, HeldShare};
 pub use crate::shares::{SHARES_PER_DAY, SHARING_TERMS};
 pub use crate::withdrawals::{Reason, WithdrawError, Withdrawal};
 
@@ -321,17 +328,28 @@ impl Library {
         reports::state(&self.pool, report).await
     }
 
-    /// Records a moderator's decision at `now`: an upheld report withdraws
-    /// the item by moderation, a rejected one puts it back; the reporter
-    /// and the author are told.
+    /// Records the decision of the moderator `moderator` (their Minute Jar
+    /// account) at `now`: an upheld report withdraws the item by
+    /// moderation, a rejected one puts it back; the reporter and the author
+    /// are told, and the decisions log keeps it.
     pub async fn decide_report(
         &self,
+        moderator: &str,
         report: &str,
         decision: Decision,
         now: Timestamp,
     ) -> Result<(), DecideError> {
         let desk = self.reports.as_ref().ok_or(DecideError::Unavailable)?;
-        reports::decide(&self.pool, &self.signing, desk, report, decision, now).await
+        moderation::decide_report(
+            &self.pool,
+            &self.signing,
+            desk,
+            moderator,
+            report,
+            decision,
+            now,
+        )
+        .await
     }
 
     /// Sends to a moderator the reports their author left 7 days without a
@@ -355,6 +373,92 @@ impl Library {
         reports::author_notifications(&self.pool, item).await
     }
 
+    /// Names the Minute Jar account `subject` a moderator at `now`, known to
+    /// other moderators as `handle`. Only the operator does this: no route does.
+    pub async fn grant_moderator(
+        &self,
+        subject: &str,
+        handle: &str,
+        now: Timestamp,
+    ) -> Result<(), ModeratorError> {
+        moderation::grant(&self.pool, subject, handle, now).await
+    }
+
+    /// Ends the moderator role of `subject`; answers whether it had it.
+    pub async fn revoke_moderator(&self, subject: &str) -> Result<bool, sqlx::Error> {
+        moderation::revoke(&self.pool, subject).await
+    }
+
+    /// Receives at `now` an appeal of the decision on `report` by its author
+    /// or its reporter; answers the appeal's identifier.
+    pub async fn appeal(
+        &self,
+        report: &str,
+        appeal: Appeal,
+        now: Timestamp,
+    ) -> Result<String, AppealError> {
+        moderation::appeal(&self.pool, report, appeal, now).await
+    }
+
+    /// An appeal as its appellant may follow it.
+    pub async fn appeal_state(&self, appeal: &str) -> Result<Option<AppealState>, sqlx::Error> {
+        moderation::appeal_state(&self.pool, appeal).await
+    }
+
+    /// Records at `now` the decision of the moderator `moderator` on an
+    /// appeal, who must not be the one who decided the report: a reversal
+    /// undoes the decision. The appellant and the author are told, and the
+    /// decisions log keeps it.
+    pub async fn decide_appeal(
+        &self,
+        moderator: &str,
+        appeal: &str,
+        decision: AppealDecision,
+        now: Timestamp,
+    ) -> Result<(), DecideError> {
+        let desk = self.reports.as_ref().ok_or(DecideError::Unavailable)?;
+        moderation::decide_appeal(
+            &self.pool,
+            &self.signing,
+            desk,
+            moderator,
+            appeal,
+            decision,
+            now,
+        )
+        .await
+    }
+
+    /// The figures of `year` for the yearly transparency report, from the
+    /// decisions log: counts by reason and outcome, without personal data.
+    /// `None` for a year out of range.
+    pub async fn transparency_figures(&self, year: i16) -> Result<Option<Figures>, sqlx::Error> {
+        moderation::figures(&self.pool, year).await
+    }
+
+    /// The history of `item` in moderation, oldest first, if it exists.
+    pub async fn moderation_history(&self, item: &str) -> Result<Option<History>, sqlx::Error> {
+        moderation::history(&self.pool, item).await
+    }
+
+    /// Records at `now` the decision of the moderator `moderator` on a share
+    /// the review held: publishes it under its author's pseudonym, or
+    /// refuses it with the reasons its author reads. The decisions log keeps it.
+    pub async fn decide_share(
+        &self,
+        moderator: &str,
+        share: &str,
+        decision: HeldDecision,
+        now: Timestamp,
+    ) -> Result<(), HeldDecisionError> {
+        shares::held::decide(self, moderator, share, decision, now).await
+    }
+
+    /// What waits for a moderator, in one queue, oldest first.
+    pub async fn moderation_cases(&self) -> Result<Vec<Case>, sqlx::Error> {
+        moderation::cases(&self.pool).await
+    }
+
     /// Signs the index and the withdrawal list again at `now`, before they expire.
     pub async fn refresh(&self, now: Timestamp) -> Result<(), sqlx::Error> {
         catalogue::refresh(&self.pool, &self.signing, now).await
@@ -366,6 +470,7 @@ impl Library {
             .merge(browse::router(self.clone()))
             .merge(item_page::router(self.clone()))
             .merge(accounts::http::router(self.clone()))
+            .merge(moderation::http::router(self.clone()))
             .merge(accounts::closing::router(self.clone()))
             .merge(cards::http::router(self.clone()))
             .merge(shares::http::router(self.clone()))
