@@ -100,6 +100,8 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             "/v1/appeals/00000000000000000000000000000000".into(),
             None,
         ),
+        // Closing ends the session: last but one.
+        ("DELETE", "/api/account".into(), None),
         ("DELETE", "/api/session".into(), None),
     ]
 }

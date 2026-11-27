@@ -7,6 +7,7 @@
 //! SHA-256 only. Nothing here touches a library identifier: no table of
 //! accounts has one, and the routes of family servers refuse a session.
 
+pub(crate) mod closing;
 pub(crate) mod http;
 
 use std::future::Future;

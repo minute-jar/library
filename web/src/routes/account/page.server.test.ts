@@ -169,4 +169,62 @@ describe('the library account page', () => {
 		expect(api.accounts.get('subject-1')?.pseudonym).toBe('Barn owl');
 		expect(refused).toMatchObject({ status: 400, data: { refused: 'bad_pseudonym' } });
 	});
+
+	it('closes the account once the parent confirms, and ends the session', async () => {
+		const api = fakeAccounts();
+		const session = api.signedIn('subject-1', owl);
+		const page = event('/account', api, session, { understood: 'on' });
+
+		const answer = await actions.close(page as unknown as ActionEvent);
+
+		expect(answer).toEqual({ closed: true });
+		expect(api.asked.at(-1)).toEqual({
+			method: 'DELETE',
+			path: '/api/account',
+			session,
+			body: undefined
+		});
+		expect(page.written[SESSION_COOKIE].options.deleted).toBe(true);
+		expect(api.sessions.has(session)).toBe(false);
+	});
+
+	it('does not close the account unless the parent confirms', async () => {
+		const api = fakeAccounts();
+		const session = api.signedIn('subject-1', owl);
+
+		const answer = await actions.close(
+			event('/account', api, session, {}) as unknown as ActionEvent
+		);
+
+		expect(answer).toMatchObject({ status: 400, data: { refused: 'confirmation_required' } });
+		expect(api.asked).toEqual([]);
+	});
+
+	it('asks for a strong sign-in again before closing', async () => {
+		const api = fakeAccounts();
+		api.strong = false;
+		const session = api.signedIn('subject-1', owl);
+		const page = event('/account', api, session, { understood: 'on' });
+
+		const answer = await actions.close(page as unknown as ActionEvent);
+
+		expect(answer).toMatchObject({ status: 403, data: { refused: 'strong_sign_in_required' } });
+		expect(api.accounts.get('subject-1')).toEqual(owl);
+		expect(page.written[SESSION_COOKIE]).toBeUndefined();
+	});
+
+	it('keeps the pseudonym of a closed account from others', async () => {
+		const api = fakeAccounts();
+		const session = api.signedIn('subject-1', owl);
+		await actions.close(
+			event('/account', api, session, { understood: 'on' }) as unknown as ActionEvent
+		);
+		const other = api.signedIn('subject-2');
+
+		const answer = await actions.open(
+			event('/account', api, other, opening) as unknown as ActionEvent
+		);
+
+		expect(answer).toMatchObject({ status: 409, data: { refused: 'pseudonym_taken' } });
+	});
 });
