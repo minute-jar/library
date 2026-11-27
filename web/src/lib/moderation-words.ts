@@ -2,6 +2,7 @@
 
 import { getLocale } from '#lib/paraglide/runtime.js';
 import { m } from '#lib/paraglide/messages.js';
+import type { Case } from '#lib/server/moderation.ts';
 
 const reasons: Record<string, () => string> = {
 	personal_data: m.reason_personal_data,
@@ -30,7 +31,9 @@ const refusals: Record<string, () => string> = {
 	reasons_required: m.refused_reasons_required,
 	outcome_required: m.refused_outcome_required,
 	same_moderator: m.refused_same_moderator,
-	already_decided: m.refused_already_decided
+	already_decided: m.refused_already_decided,
+	reason_required: m.refused_reason_required,
+	unknown_share: m.refused_other
 };
 
 export const reasonWord = (code: string) => (reasons[code] ?? m.reason_other)();
@@ -48,3 +51,10 @@ export const moment = (date: string) =>
 		timeStyle: 'short',
 		timeZone: 'UTC'
 	}).format(new Date(date));
+
+/** A case's identifier, whatever its kind. */
+export function caseId(waiting: Case): string {
+	if (waiting.kind === 'report') return waiting.report;
+	if (waiting.kind === 'appeal') return waiting.appeal;
+	return waiting.share;
+}

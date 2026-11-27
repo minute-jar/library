@@ -24,6 +24,7 @@ use crate::Library;
 use crate::accounts::http::{Refusal, signed_in};
 use crate::contract::time;
 use crate::reports::{DecideError, Decision, Outcome};
+use crate::shares::held::{HeldDecision, HeldDecisionError, HeldOutcome};
 
 pub fn router(library: Library) -> Router {
     Router::new()
@@ -36,6 +37,10 @@ pub fn router(library: Library) -> Router {
         .route(
             "/api/moderation/appeals/{appeal}/decision",
             post(decide_appeal),
+        )
+        .route(
+            "/api/moderation/shares/{share}/decision",
+            post(decide_share),
         )
         .route("/api/moderation/figures/{year}", get(figures))
         .route("/v1/reports/{report}/appeal", post(family_appeal))
@@ -239,6 +244,19 @@ async fn case_json(library: &Library, case: &Case) -> Result<Value, sqlx::Error>
             "received_at": time(appeal.received_at),
             "due_at": due_at,
         }),
+        Case::HeldReview(share) => json!({
+            "kind": "held_review",
+            "share": share.share,
+            "item": share.item,
+            "title": share.title,
+            "pseudonym": share.pseudonym,
+            "findings": share.findings,
+            "type": share.kind,
+            "metadata": share.metadata,
+            "content": share.content,
+            "received_at": time(share.received_at),
+            "due_at": due_at,
+        }),
     })
 }
 
@@ -321,6 +339,55 @@ async fn decide_appeal(
         .decide_appeal(&moderator.subject, &appeal, decision, moderator.now)
         .await
         .map_err(decide_refusal)?;
+    Ok(decided())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum AskedHeldOutcome {
+    Published,
+    Refused,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AskedHeldDecision {
+    outcome: AskedHeldOutcome,
+    reason: String,
+    reasons: String,
+}
+
+/// A moderator publishes or refuses a share the review held.
+async fn decide_share(
+    State(library): State<Library>,
+    Path(share): Path<String>,
+    headers: HeaderMap,
+    request: Bytes,
+) -> Answer {
+    let moderator = moderator(&library, &headers).await?;
+    let asked: AskedHeldDecision = body(&request)?;
+    let reason = crate::Reason::from_code(&asked.reason)
+        .ok_or_else(|| refused(StatusCode::BAD_REQUEST, "bad_request"))?;
+    let decision = HeldDecision {
+        outcome: match asked.outcome {
+            AskedHeldOutcome::Published => HeldOutcome::Published,
+            AskedHeldOutcome::Refused => HeldOutcome::Refused,
+        },
+        reason,
+        reasons: asked.reasons,
+    };
+    library
+        .decide_share(&moderator.subject, &share, decision, moderator.now)
+        .await
+        .map_err(|error| match error {
+            HeldDecisionError::NotAModerator => refused(StatusCode::FORBIDDEN, "not_a_moderator"),
+            HeldDecisionError::UnknownShare => refused(StatusCode::NOT_FOUND, "unknown_share"),
+            HeldDecisionError::AlreadyDecided => refused(StatusCode::CONFLICT, "already_decided"),
+            HeldDecisionError::ReasonsRequired => {
+                refused(StatusCode::BAD_REQUEST, "reasons_required")
+            }
+            HeldDecisionError::Unavailable => unavailable(()),
+        })?;
     Ok(decided())
 }
 

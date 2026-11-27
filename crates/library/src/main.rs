@@ -18,6 +18,10 @@
 //! `unavailable`) until the identity service's adapter is wired, with the
 //! identity service of `minute-jar/hosting` (ADR-0006).
 //!
+//! Sharing (`POST /api/shares`) answers `503` until the review adapter
+//! (ticket 13) is wired here with `Library::with_sharing`; it needs sign-in
+//! and card verification too.
+//!
 //! Card verification stays off too (its routes answer `unavailable`) until
 //! the Stripe adapter is written, once Stripe confirms ADR-0007, and wired
 //! with `Library::with_cards`.

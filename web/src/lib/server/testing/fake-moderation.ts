@@ -3,7 +3,14 @@
 // API: it answers what a test sets and remembers the decisions it was given.
 
 import type { FakeAccounts } from './fake-accounts.ts';
-import type { AppealCase, Case, Figures, History, ReportCase } from '../moderation.ts';
+import type {
+	AppealCase,
+	Case,
+	Figures,
+	HeldReviewCase,
+	History,
+	ReportCase
+} from '../moderation.ts';
 
 export const rightsReport: ReportCase = {
 	kind: 'report',
@@ -37,6 +44,20 @@ export const authorAppeal: AppealCase = {
 	},
 	received_at: '2026-11-26T12:00:00Z',
 	due_at: '2026-11-28T12:00:00Z'
+};
+
+export const heldShare: HeldReviewCase = {
+	kind: 'held_review',
+	share: 'dddddddddddddddddddddddddddddddd',
+	item: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+	title: 'Capitals of Europe',
+	pseudonym: 'Owl',
+	findings: 'Question 2 may name a school.',
+	type: 'bank',
+	metadata: { language: 'en-GB', subject: 'geography', description: 'Forty capitals.' },
+	content: { questions: [{ type: 'typed', prompt: 'Capital of Spain', answers: ['Madrid'] }] },
+	received_at: '2026-11-26T14:00:00Z',
+	due_at: '2026-11-28T14:00:00Z'
 };
 
 export const verbsHistory: History = {
@@ -115,6 +136,17 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 				? json(figures)
 				: json({ year: Number(year[1]), reports: [], decisions: [], appeals: [] });
 		}
+		const held = path.match(/^\/api\/moderation\/shares\/([^/]+)\/decision$/);
+		if (held && request.method === 'POST') {
+			const { reasons } = (body ?? {}) as { reasons?: string };
+			if (!reasons?.trim()) return refused(400, 'reasons_required');
+			const index = fake.cases.findIndex(
+				(waiting) => waiting.kind === 'held_review' && waiting.share === held[1]
+			);
+			if (index < 0) return refused(404, 'unknown_share');
+			fake.cases.splice(index, 1);
+			return new Response(null, { status: 204 });
+		}
 		const decided = path.match(/^\/api\/moderation\/(reports|appeals)\/([^/]+)\/decision$/);
 		if (decided && request.method === 'POST') {
 			const { outcome, reasons } = (body ?? {}) as { outcome?: string; reasons?: string };
@@ -127,6 +159,7 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 			);
 			if (index < 0) return refused(404, kind === 'reports' ? 'unknown_report' : 'unknown_appeal');
 			const [done] = fake.cases.splice(index, 1);
+			if (done.kind === 'held_review') return refused(404, 'unknown_report');
 			if (done.kind === 'appeal' && done.decision.moderator === handle) {
 				fake.cases.splice(index, 0, done);
 				return refused(403, 'same_moderator');

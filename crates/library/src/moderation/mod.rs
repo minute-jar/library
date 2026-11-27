@@ -21,6 +21,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 
 use crate::contract::SigningKey;
 use crate::reports::{self, DecideError, Decision, Effect, FormalNotice, Outcome, QueuedReport};
+use crate::shares::held::HeldShare;
 use crate::withdrawals::Reason;
 
 /// How soon a moderator should decide what reaches the queue.
@@ -98,12 +99,13 @@ pub(crate) async fn handle_of(pool: &PgPool, subject: &str) -> Result<Option<Str
     Ok(row.map(|(handle,)| handle))
 }
 
-/// Something waiting for a moderator in the one queue, oldest first. Held
-/// review findings (ticket 13) will be a third kind.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// Something waiting for a moderator in the one queue, oldest first.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Case {
     Report(QueuedReport),
     Appeal(QueuedAppeal),
+    /// A share the review held, with its findings.
+    HeldReview(HeldShare),
 }
 
 impl Case {
@@ -112,6 +114,7 @@ impl Case {
         match self {
             Case::Report(report) => report.received_at,
             Case::Appeal(appeal) => appeal.received_at,
+            Case::HeldReview(share) => share.received_at,
         }
     }
 
@@ -130,6 +133,12 @@ pub(crate) async fn cases(pool: &PgPool) -> Result<Vec<Case>, sqlx::Error> {
         .into_iter()
         .map(Case::Report)
         .chain(appeals::queue(pool).await?.into_iter().map(Case::Appeal))
+        .chain(
+            crate::shares::held::queue(pool)
+                .await?
+                .into_iter()
+                .map(Case::HeldReview),
+        )
         .collect();
     cases.sort_by_key(Case::received_at);
     Ok(cases)

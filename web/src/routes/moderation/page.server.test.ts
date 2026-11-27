@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SESSION_COOKIE } from '#lib/server/accounts.ts';
 import { fakeAccounts, fakeCookies } from '#lib/server/testing/fake-accounts.ts';
-import { authorAppeal, fakeModeration, rightsReport } from '#lib/server/testing/fake-moderation.ts';
+import {
+	authorAppeal,
+	fakeModeration,
+	heldShare,
+	rightsReport
+} from '#lib/server/testing/fake-moderation.ts';
 import { actions, load } from './+page.server.ts';
 
 type LoadEvent = Parameters<typeof load>[0];
@@ -162,6 +167,45 @@ describe('the moderation queue', () => {
 			method: 'POST',
 			path: `/api/moderation/appeals/${authorAppeal.appeal}/decision`,
 			body: { outcome: 'reversed', reasons: 'The questions are on topic.' }
+		});
+	});
+
+	it('shows a share the review held, with its findings and its content', async () => {
+		const fakes = api();
+		fakes.moderation.cases.push(structuredClone(heldShare));
+		const session = fakes.accounts.signedIn('subject-1');
+
+		const data = await load(event(fakes, session) as unknown as LoadEvent);
+
+		expect(data.cases.at(-1)).toEqual(heldShare);
+	});
+
+	it('publishes or refuses a held share, naming the rule its findings were about', async () => {
+		const fakes = api();
+		fakes.moderation.cases.push(structuredClone(heldShare));
+		const session = fakes.accounts.signedIn('subject-1');
+		const form = {
+			share: heldShare.share,
+			outcome: 'refused',
+			reason: 'personal_data',
+			reasons: 'Question 2 names a real school.'
+		};
+
+		const withoutReason = await actions.decideShare(
+			event(fakes, session, { ...form, reason: '' }) as unknown as ActionEvent
+		);
+		const answer = await actions.decideShare(event(fakes, session, form) as unknown as ActionEvent);
+
+		expect(withoutReason).toMatchObject({ status: 400, data: { refused: 'reason_required' } });
+		expect(answer).toEqual({ decided: heldShare.share });
+		expect(fakes.moderation.asked.at(-1)).toEqual({
+			method: 'POST',
+			path: `/api/moderation/shares/${heldShare.share}/decision`,
+			body: {
+				outcome: 'refused',
+				reason: 'personal_data',
+				reasons: 'Question 2 names a real school.'
+			}
 		});
 	});
 

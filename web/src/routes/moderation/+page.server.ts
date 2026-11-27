@@ -8,7 +8,9 @@ import { Unavailable } from '#lib/server/catalogue.ts';
 import {
 	type AppealOutcome,
 	type Case,
+	type HeldOutcome,
 	type Outcome,
+	type Reason,
 	access,
 	moderation
 } from '#lib/server/moderation.ts';
@@ -32,13 +34,29 @@ function text(form: FormData, name: string): string {
 	return typeof value === 'string' ? value : '';
 }
 
+const REASONS: Reason[] = [
+	'personal_data',
+	'sexual_content',
+	'illegal_content',
+	'rights',
+	'unsuitable_content',
+	'wrong_answer',
+	'other'
+];
+
 /** Asks the service to decide, then answers what the page shows. */
 async function deciding(
 	request: Request,
 	cookies: { get(name: string): string | undefined },
-	field: 'report' | 'appeal',
+	field: 'report' | 'appeal' | 'share',
 	outcomes: string[],
-	decide: (session: string, id: string, outcome: string, reasons: string) => Promise<void>
+	decide: (
+		session: string,
+		id: string,
+		outcome: string,
+		reasons: string,
+		form: FormData
+	) => Promise<void>
 ) {
 	const form = await request.formData();
 	const id = text(form, field);
@@ -48,8 +66,11 @@ async function deciding(
 	const session = cookies.get(SESSION_COOKIE);
 	if (!session) return fail(401, { refused: 'signed_out', ...values });
 	if (!outcomes.includes(outcome)) return fail(400, { refused: 'outcome_required', ...values });
+	if (field === 'share' && !REASONS.includes(text(form, 'reason') as Reason)) {
+		return fail(400, { refused: 'reason_required', ...values });
+	}
 	try {
-		await decide(session, id, outcome, reasons);
+		await decide(session, id, outcome, reasons, form);
 		return { decided: id };
 	} catch (failure) {
 		if (failure instanceof Refused)
@@ -72,5 +93,20 @@ export const actions = {
 			['maintained', 'reversed'],
 			(session, id, outcome, reasons) =>
 				moderation(fetch).decideAppeal(session, id, outcome as AppealOutcome, reasons)
+		),
+	decideShare: ({ request, fetch, cookies }) =>
+		deciding(
+			request,
+			cookies,
+			'share',
+			['published', 'refused'],
+			(session, id, outcome, reasons, form) =>
+				moderation(fetch).decideShare(
+					session,
+					id,
+					outcome as HeldOutcome,
+					text(form, 'reason') as Reason,
+					reasons
+				)
 		)
 } satisfies Actions;

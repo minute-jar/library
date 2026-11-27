@@ -7,7 +7,15 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import * as Card from '#lib/components/ui/card/index.js';
 	import ModerationAccess from '#lib/components/moderation-access.svelte';
-	import { day, moment, outcomeWord, reasonWord, refusalWord } from '#lib/moderation-words.ts';
+	import {
+		caseId,
+		day,
+		moment,
+		outcomeWord,
+		reasonWord,
+		refusalWord
+	} from '#lib/moderation-words.ts';
+	import type { Case } from '#lib/server/moderation.ts';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -21,6 +29,36 @@
 	const refusedCase = $derived(form && 'refused' in form ? form.case : null);
 	const refused = $derived(form && 'refused' in form ? refusalWord(form.refused ?? '') : null);
 	const typed = (id: string) => (form && 'refused' in form && form.case === id ? form.reasons : '');
+	const REASONS = [
+		'personal_data',
+		'sexual_content',
+		'illegal_content',
+		'rights',
+		'unsuitable_content',
+		'wrong_answer',
+		'other'
+	];
+	const actionOf = (waiting: Case) =>
+		waiting.kind === 'report'
+			? '?/decideReport'
+			: waiting.kind === 'appeal'
+				? '?/decideAppeal'
+				: '?/decideShare';
+	const fieldOf = (waiting: Case) => (waiting.kind === 'held_review' ? 'share' : waiting.kind);
+	const outcomesOf = (waiting: Case) =>
+		waiting.kind === 'report'
+			? ['upheld', 'rejected']
+			: waiting.kind === 'appeal'
+				? ['maintained', 'reversed']
+				: ['published', 'refused'];
+	const outcomeLabels: Record<string, () => string> = {
+		upheld: m.outcome_upheld,
+		rejected: m.outcome_rejected,
+		maintained: m.outcome_maintained,
+		reversed: m.outcome_reversed,
+		published: m.outcome_publish_held,
+		refused: m.outcome_refuse_held
+	};
 </script>
 
 <svelte:head>
@@ -47,8 +85,8 @@
 		<p>{m.moderation_empty()}</p>
 	{/if}
 	<div class="grid gap-6">
-		{#each data.cases as waiting (waiting.kind === 'report' ? waiting.report : waiting.appeal)}
-			{@const id = waiting.kind === 'report' ? waiting.report : waiting.appeal}
+		{#each data.cases as waiting (caseId(waiting))}
+			{@const id = caseId(waiting)}
 			<article aria-labelledby="case-{id}">
 				<Card.Root>
 					<Card.Header>
@@ -56,11 +94,15 @@
 							<Badge variant="secondary">
 								{waiting.kind === 'report'
 									? m.moderation_report()
-									: waiting.appellant === 'author'
-										? m.moderation_appeal_author()
-										: m.moderation_appeal_reporter()}
+									: waiting.kind === 'held_review'
+										? m.moderation_held_review()
+										: waiting.appellant === 'author'
+											? m.moderation_appeal_author()
+											: m.moderation_appeal_reporter()}
 							</Badge>
-							<Badge variant="outline">{reasonWord(waiting.reason)}</Badge>
+							{#if waiting.kind !== 'held_review'}
+								<Badge variant="outline">{reasonWord(waiting.reason)}</Badge>
+							{/if}
 						</Card.Description>
 						<Card.Title>
 							<h2 id="case-{id}" class="text-lg">
@@ -91,6 +133,20 @@
 									<p class="whitespace-pre-line">{waiting.findings}</p>
 								</div>
 							{/if}
+						{:else if waiting.kind === 'held_review'}
+							<p>{m.moderation_held_by({ pseudonym: waiting.pseudonym })}</p>
+							<div>
+								<h3 class="font-medium">{m.moderation_findings()}</h3>
+								<p class="whitespace-pre-line">{waiting.findings}</p>
+							</div>
+							<details>
+								<summary class="cursor-pointer font-medium">{m.moderation_held_content()}</summary>
+								<pre class="mt-2 overflow-x-auto rounded-md bg-muted p-3 text-xs">{JSON.stringify(
+										waiting.content,
+										null,
+										2
+									)}</pre>
+							</details>
 						{:else}
 							<div>
 								<p>
@@ -107,39 +163,41 @@
 								<p class="whitespace-pre-line">{waiting.statement}</p>
 							</div>
 						{/if}
-						<p>
-							<a
-								href={href(`/moderation/items/${waiting.item}`)}
-								class="underline underline-offset-4"
-							>
-								{m.moderation_history_link()}
-							</a>
-						</p>
+						{#if waiting.kind !== 'held_review'}
+							<p>
+								<a
+									href={href(`/moderation/items/${waiting.item}`)}
+									class="underline underline-offset-4"
+								>
+									{m.moderation_history_link()}
+								</a>
+							</p>
+						{/if}
 
-						<form
-							method="post"
-							action={waiting.kind === 'report' ? '?/decideReport' : '?/decideAppeal'}
-							class="grid gap-3 border-t pt-3"
-						>
-							<input type="hidden" name={waiting.kind} value={id} />
+						<form method="post" action={actionOf(waiting)} class="grid gap-3 border-t pt-3">
+							<input type="hidden" name={fieldOf(waiting)} value={id} />
 							{#if refusedCase === id && refused}
 								<p role="alert" class="text-destructive">{refused}</p>
 							{/if}
 							<fieldset class="grid gap-2">
 								<legend class="mb-1 font-medium">{m.moderation_outcome()}</legend>
-								{#each waiting.kind === 'report' ? ['upheld', 'rejected'] : ['maintained', 'reversed'] as outcome (outcome)}
+								{#each outcomesOf(waiting) as outcome (outcome)}
 									<label class="flex gap-2">
 										<input type="radio" name="outcome" value={outcome} required />
-										{outcome === 'upheld'
-											? m.outcome_upheld()
-											: outcome === 'rejected'
-												? m.outcome_rejected()
-												: outcome === 'maintained'
-													? m.outcome_maintained()
-													: m.outcome_reversed()}
+										{outcomeLabels[outcome]()}
 									</label>
 								{/each}
 							</fieldset>
+							{#if waiting.kind === 'held_review'}
+								<label class="grid gap-1">
+									{m.moderation_held_reason()}
+									<select name="reason" required class="rounded-md border bg-transparent px-3 py-2">
+										{#each REASONS as reason (reason)}
+											<option value={reason}>{reasonWord(reason)}</option>
+										{/each}
+									</select>
+								</label>
+							{/if}
 							<label class="grid gap-1">
 								{m.moderation_reasons()}
 								<textarea

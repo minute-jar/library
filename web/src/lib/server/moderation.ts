@@ -53,8 +53,27 @@ export type AppealCase = {
 	due_at: string;
 };
 
-/** What waits in the one queue; held review findings will come with ticket 13. */
-export type Case = ReportCase | AppealCase;
+/** A share the review held for a moderator, who publishes or refuses it. */
+export type HeldReviewCase = {
+	kind: 'held_review';
+	share: string;
+	item: string;
+	title: string;
+	/** The author's pseudonym, under which it would be published. */
+	pseudonym: string;
+	findings: string;
+	type: 'bank' | 'path';
+	metadata: { language: string; subject: string; description: string };
+	/** The bank or learning path, in the bank format. */
+	content: unknown;
+	received_at: string;
+	due_at: string;
+};
+
+export type HeldOutcome = 'published' | 'refused';
+
+/** What waits in the one queue. */
+export type Case = ReportCase | AppealCase | HeldReviewCase;
 
 export type HistoryEntry =
 	| {
@@ -160,6 +179,21 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 				`/api/moderation/appeals/${encodeURIComponent(appeal)}/decision`,
 				session,
 				{ outcome, reasons }
+			);
+		},
+		/** Publishes or refuses a held share, naming the rule its findings were about. */
+		decideShare(
+			session: string,
+			share: string,
+			outcome: HeldOutcome,
+			reason: Reason,
+			reasons: string
+		) {
+			return call<void>(
+				'POST',
+				`/api/moderation/shares/${encodeURIComponent(share)}/decision`,
+				session,
+				{ outcome, reason, reasons }
 			);
 		},
 		figures(session: string, year: number) {

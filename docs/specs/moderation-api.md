@@ -40,7 +40,17 @@ An appeal waiting for another moderator, with the decision it is against:
  "received_at": "2026-11-27T10:01:00Z", "due_at": "2026-11-29T10:01:00Z"}
 ```
 
-Versions held by the review with its findings (ticket 13) will be a third `kind`, `held_review`.
+A share the review held (`interface-v1.md`, Shares), not yet published, with the review's findings and the prepared item for the moderator to read:
+
+```json
+{"kind": "held_review", "share": "<32 hex>", "item": "<32 hex>", "title": "Irregular verbs",
+ "pseudonym": "Owl", "findings": "Question 2 may name a school.", "type": "bank",
+ "metadata": {"language": "en-GB", "...": "as the parent app sent it"},
+ "content": {"...": "the bank or learning path"},
+ "received_at": "2026-11-27T10:00:00Z", "due_at": "2026-11-29T10:00:00Z"}
+```
+
+`pseudonym` is the author's pseudonym now, under which a publication would go. A held share has no history: its item is not in the catalogue yet.
 
 ## History
 
@@ -56,9 +66,10 @@ Versions held by the review with its findings (ticket 13) will be a third `kind`
 
 - `POST /api/moderation/reports/{report}/decision` with `{"outcome": "upheld" | "rejected", "reasons": "..."}` answers `204`. An upheld report withdraws the item by moderation for the report's reason; a rejected one ends the switch-off or the hiding once no other report for the same reasons waits (`interface-v1.md`, Reports). The reasons go to the reporter (by e-mail through the notifier if they left an address, otherwise in `GET /v1/reports/{report}`) and to the author (`Library::author_notifications`, until accounts deliver them).
 - `POST /api/moderation/appeals/{appeal}/decision` with `{"outcome": "maintained" | "reversed", "reasons": "..."}` answers `204`. It must come from another moderator than the one who decided the report. A reversal undoes the decision: an upheld report becomes rejected and the item comes back (unless another upheld report keeps it withdrawn), a rejected one becomes upheld and the item is withdrawn; the report's status and decision then read the appeal's. The reasons go to the author, and to the reporter who appealed and left an address.
-- Refusals: `400` `bad_request` (not exactly the expected object, an unknown outcome), `400` `reasons_required` (empty reasons), `403` `same_moderator`, `404` `unknown_report` or `unknown_appeal`, `409` `already_decided` (decided already, or closed by the author's correction), `503` `unavailable` (reports are not turned on, or the database fails).
+- `POST /api/moderation/shares/{share}/decision` with `{"outcome": "published" | "refused", "reason": "<reason code>", "reasons": "..."}` answers `204`. `reason` is the rule the findings were about, one of the codes of the withdrawal list. `published` publishes the held share as version 1 of its item, at the decision's instant, under the author's pseudonym of that moment; `refused` refuses it, and the author reads, in their shares, the reason and the moderator's reasons as a refusal of the whole item (`{"question": null, "reason", "explanation": <reasons>}`). The decisions log counts a refusal as `upheld` (the findings hold) and a publication as `rejected`, so that the transparency figures count every decision that restricts content alike.
+- Refusals: `400` `bad_request` (not exactly the expected object, an unknown outcome or reason), `400` `reasons_required` (empty reasons), `403` `same_moderator`, `404` `unknown_report`, `unknown_appeal` or `unknown_share`, `409` `already_decided` (decided already, or closed by the author's correction), `503` `unavailable` (reports are not turned on, or the database fails).
 
-Every decision enters the decisions log (table `moderation_decisions`): what it was on, its reason, outcome, reasons, moderator and instant.
+Every decision enters the decisions log (table `moderation_decisions`, `case_kind` `report` or `held_review`): what it was on, its reason, outcome, reasons, moderator and instant.
 
 ## Transparency figures
 
@@ -71,7 +82,7 @@ Every decision enters the decisions log (table `moderation_decisions`): what it 
  "appeals": [{"appellant": "author", "outcome": "reversed", "count": 1}]}
 ```
 
-`reports` counts the reports received in the year by reason; `decisions` the moderators' decisions on reports made in the year (not their appeals) by reason and outcome; `appeals` the appeals received in the year by appellant and where they stand (`waiting`, `maintained`, `reversed`). Each list is ordered by its codes. A year that is not a number answers `400` `bad_request`. `Library::transparency_figures` answers the same.
+`reports` counts the reports received in the year by reason; `decisions` the moderators' decisions on reports and held shares made in the year (not their appeals) by reason and outcome; `appeals` the appeals received in the year by appellant and where they stand (`waiting`, `maintained`, `reversed`). Each list is ordered by its codes. A year that is not a number answers `400` `bad_request`. `Library::transparency_figures` answers the same.
 
 ## HTTP
 

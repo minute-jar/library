@@ -262,3 +262,4 @@ pub const PIXEL: &str = "497790947d4666760ce38f3c00e852c71fdb66cae849bae8e9ede35
 
 pub mod cards;
 pub mod identity;
+pub mod shares;
