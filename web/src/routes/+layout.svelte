@@ -23,6 +23,12 @@
 <div class="mx-auto flex min-h-screen max-w-5xl flex-col px-4">
 	<header class="flex flex-wrap items-center justify-between gap-4 border-b py-4">
 		<a href={resolve(localizeHref('/') as Path)} class="text-lg font-semibold">{m.site_name()}</a>
+		<a
+			href={resolve(localizeHref('/account') as Path)}
+			class="ml-auto text-sm underline-offset-4 hover:underline"
+		>
+			{m.account_link()}
+		</a>
 		<nav aria-label={m.language_switch()} class="flex gap-3 text-sm">
 			{#each locales as locale (locale)}
 				<a

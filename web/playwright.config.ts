@@ -1,6 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
-// The website, built, over a stand-in for the catalogue API (`e2e/fake-api.ts`).
+// The website, built, over a stand-in for the catalogue and accounts APIs and the
+// identity provider (`e2e/fake-api.ts`).
 export default defineConfig({
 	testDir: 'e2e',
 	testMatch: '**/*.e2e.ts',
