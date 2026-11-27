@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index, shared items and imports. The withdrawal list, media, ratings, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items, imports and ratings. The withdrawal list, media, reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
 
 ## Signed documents
 
@@ -79,7 +79,7 @@ A family server accepts another signed document only if its `key` is listed in a
         "curriculum": {"country": "GB", "year": "Year 5", "topic": "Verb forms"}
       },
       "selection": false,
-      "signals": {"families": 0},
+      "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
       "published_at": "2026-11-20T18:00:00Z"
     }
   ]
@@ -93,6 +93,7 @@ A family server accepts another signed document only if its `key` is listed in a
 - `metadata.language` is a BCP 47 tag; `curriculum` may be `null`.
 - An index lives three days; the library issues a new one at least daily.
 - `signals.families` is the number of distinct library identifiers that reported importing the item, at any of its versions, as of when the index was signed (see Imports). A family server whose parent renews its library identifier counts again under the new one.
+- `signals.ratings` is five counts: how many library identifiers rated the item 1, 2, 3, 4 and 5 stars, as of when the index was signed (see Ratings). Whole numbers only, so that every client computes the same average.
 
 ## Shared items
 
@@ -122,7 +123,7 @@ A family server accepts another signed document only if its `key` is listed in a
 
 ## Library identifier
 
-A family server draws its **library identifier** for one library alone: 128 random bits from a cryptographic source, written as 32 lowercase hexadecimal digits. It is linked to nothing else, and a parent may draw a new one at any time. Every anonymous call a family server makes to the library (imports here; ratings, reports, suggestions and, in step 2, contributions in later versions) carries it the same way:
+A family server draws its **library identifier** for one library alone: 128 random bits from a cryptographic source, written as 32 lowercase hexadecimal digits. It is linked to nothing else, and a parent may draw a new one at any time. Every anonymous call a family server makes to the library (imports and ratings here; reports, suggestions and, in step 2, contributions in later versions) carries it the same way:
 
 - as the field `library_identifier` of a JSON request body, `POST`ed with `Content-Type: application/json`;
 - never in a path, a query string, a header or a cookie, so that no access log in front of the library records it;
@@ -146,6 +147,40 @@ Content-Type: application/json
 - The answer is `204 No Content`, with no body and no cookie. Reporting the same item again under the same identifier, at another version or not, changes nothing and answers `204` too.
 - An unknown item answers `404` with `{"error": "unknown_item"}`.
 - The import counts in `signals.families` of the next index the library signs; the index served until then is unchanged.
+
+## Ratings
+
+Once a family has used an imported item, its family server may rate it, with or without a short review:
+
+```
+POST /v1/ratings
+Content-Type: application/json
+
+{"library_identifier": "<32 hex>", "item": "<32 hex>", "stars": 4, "review": "Clear and short."}
+```
+
+- `stars` is a whole number from 1 to 5. `review` is optional (absent or `null`); it is trimmed, and an empty one counts as none.
+- The answer is `204 No Content`, with no body and no cookie.
+- One rating per library identifier and item: a new one replaces the earlier rating and its review, whole. The rating counts in `signals.ratings` of the next index the library signs.
+- Only an item the identifier reported importing (see Imports) can be rated; otherwise the answer is `403` with `{"error": "not_imported"}`.
+- Refusals: `{"error": "bad_rating"}` (`400`) for stars outside 1 to 5; `{"error": "bad_review"}` (`400`) for a review longer than 280 characters (Unicode scalar values, after trimming); `bad_library_identifier`, `bad_request` and `unknown_item` as for imports.
+- The library keeps with the identifier only the item, the stars and the review, never a time.
+
+A short review is public text from an anonymous family, so it is held like any other public text: it is stored **pending** and shown nowhere until the review publishes it (or refuses it). A new rating puts its review back to pending. Until the review handles short reviews, every short review stays pending. The stars count at once, whatever becomes of the review.
+
+### For the website
+
+The website's item page reads, from the service's JSON API (not part of the contract with family servers, and not signed):
+
+```
+GET /api/items/{item}/ratings
+
+{"item": "<32 hex>", "ratings": [0, 0, 1, 3, 5], "reviews": [{"stars": 5, "text": "My son learnt them in a week."}]}
+```
+
+- `ratings` is counted as things stand, not as of the last signed index.
+- `reviews` holds only published short reviews, highest rated first, with nothing that tells families apart: no identifier, no time.
+- An unknown item answers `404` with `{"error": "unknown_item"}`.
 
 ## HTTP
 
