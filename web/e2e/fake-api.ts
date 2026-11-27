@@ -10,6 +10,7 @@ import { fakeAccounts } from '../src/lib/server/testing/fake-accounts.ts';
 import { fakeCards } from '../src/lib/server/testing/fake-cards.ts';
 import { fakeShares } from '../src/lib/server/testing/fake-shares.ts';
 import { fakeModeration } from '../src/lib/server/testing/fake-moderation.ts';
+import { fakeSuggestions } from '../src/lib/server/testing/fake-suggestions.ts';
 import { fakeAuthored } from '../src/lib/server/testing/fake-authored.ts';
 import type { AuthoredItem } from '../src/lib/server/authored.ts';
 
@@ -28,6 +29,25 @@ const accounts = fakeAccounts(root);
 const cards = fakeCards(accounts, root);
 const shares = fakeShares(accounts);
 const moderation = fakeModeration(accounts);
+const suggestions = fakeSuggestions(accounts);
+// Whoever signs in received suggestions for one item of theirs.
+suggestions.anyone = [
+	{
+		item: '0123456789abcdef0123456789abcdef',
+		title: 'Irregular verbs',
+		version: 1,
+		questions: [
+			{
+				question: 1,
+				prompt: "Past of 'go'",
+				answers: [
+					{ answer: 'goed', families: 2 },
+					{ answer: 'has gone', families: 1 }
+				]
+			}
+		]
+	}
+];
 const authored = fakeAuthored(accounts);
 // Whoever opens an account has published one item.
 authored.everyone = [verbsOfTheAuthor];
@@ -60,6 +80,7 @@ createServer((request, response) => {
 			body
 		});
 		void (
+			suggestions.fetch(asked) ??
 			shares.fetch(asked) ??
 			authored.fetch(asked) ??
 			cards.fetch(asked) ??

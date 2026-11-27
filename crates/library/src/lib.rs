@@ -22,6 +22,7 @@ mod ratings;
 mod reports;
 mod review;
 mod shares;
+mod suggestions;
 mod withdrawals;
 
 use std::sync::Arc;
@@ -59,6 +60,10 @@ pub use crate::reports::{
 pub use crate::review::{RefusalReason, ReviewFuture, ReviewOutcome, Reviewer, Submission};
 pub use crate::shares::held::{HeldDecision, HeldDecisionError, HeldOutcome, HeldShare};
 pub use crate::shares::{SHARES_PER_DAY, SHARING_TERMS};
+pub use crate::suggestions::{
+    ANSWER_LENGTH, ANSWERS_PER_SUGGESTION, Accepted, ItemSuggestions, QuestionSuggestions,
+    SuggestedAnswer, SuggestionError,
+};
 pub use crate::withdrawals::{Reason, WithdrawError, Withdrawal};
 
 /// A question bank or a learning path.
@@ -276,6 +281,52 @@ impl Library {
         ratings::of_item(&self.pool, item).await
     }
 
+    /// Records the answers to accept that the family server under
+    /// `library_identifier` suggests for `question` (from 1) of `version` of
+    /// the shared item `item`, which it must have imported. Answers the
+    /// question already accepts are left out; suggesting again changes
+    /// nothing.
+    pub async fn record_suggestion(
+        &self,
+        library_identifier: &str,
+        item: &str,
+        version: u32,
+        question: u32,
+        answers: &[&str],
+    ) -> Result<(), SuggestionError> {
+        suggestions::record(
+            &self.pool,
+            library_identifier,
+            item,
+            version,
+            question,
+            answers,
+        )
+        .await
+    }
+
+    /// The suggestions of the shared item `item` against its latest
+    /// version, each answer counted by the families that suggested it;
+    /// `None` for an unknown item.
+    pub async fn item_suggestions(
+        &self,
+        item: &str,
+    ) -> Result<Option<ItemSuggestions>, SuggestionError> {
+        suggestions::of_item(&self.pool, item).await
+    }
+
+    /// The new version of `item` that accepts the suggested answers
+    /// `accepted`: the latest version with those answers added, as the body
+    /// of the share route, which reviews it like any share. Only for the
+    /// item's author: the route checks it.
+    pub async fn prepare_from_suggestions(
+        &self,
+        item: &str,
+        accepted: &[Accepted],
+    ) -> Result<Value, SuggestionError> {
+        suggestions::prepare(&self.pool, &*self.media, item, accepted).await
+    }
+
     /// Withdraws a shared item, or one of its versions when `version` is
     /// given: it enters the withdrawal list and leaves the index.
     pub async fn withdraw(
@@ -475,6 +526,7 @@ impl Library {
             .merge(accounts::closing::router(self.clone()))
             .merge(cards::http::router(self.clone()))
             .merge(shares::http::router(self.clone()))
+            .merge(suggestions::http::router(self.clone()))
             .merge(authors_withdrawal::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,

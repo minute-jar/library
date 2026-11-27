@@ -38,6 +38,10 @@ _Avoid_: Score, vote, like
 The few words a family may leave with its rating, held until the review publishes it; not to be confused with the review itself.
 _Avoid_: Comment (from a library account), testimonial, feedback
 
+**Suggestion** (FR: Suggestion):
+An answer to accept for a question of a shared item, sent under a library identifier that imported it; its author sees how many families suggested it, never which, and may accept it into a new version.
+_Avoid_: Correction, proposal, pull request, feedback
+
 ### People
 
 **Minute Jar Account** (FR: Compte Minute Jar):
