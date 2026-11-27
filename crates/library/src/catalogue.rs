@@ -161,10 +161,13 @@ pub(crate) async fn sign_index(
         Value,
         i64,
         i64,
+        Vec<i64>,
     );
     let latest: Vec<Row> = sqlx::query_as(
         "SELECT DISTINCT ON (item) item, version, type, title, author_pseudonym, author_editorial, derived_from, metadata, published_at,
-                (SELECT count(*) FROM imports WHERE imports.item = v.item)
+                (SELECT count(*) FROM imports WHERE imports.item = v.item),
+                ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = v.item AND ratings.stars = s)
+                      FROM generate_series(1, 5) AS s ORDER BY s)
          FROM item_versions AS v
          WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
          ORDER BY item, version DESC",
@@ -173,7 +176,7 @@ pub(crate) async fn sign_index(
     .await?;
     let items: Vec<Value> = latest
         .into_iter()
-        .map(|(item, version, kind, title, pseudonym, editorial, derived_from, metadata, published_at, families)| {
+        .map(|(item, version, kind, title, pseudonym, editorial, derived_from, metadata, published_at, families, ratings)| {
             json!({
                 "item": item,
                 "version": version,
@@ -184,7 +187,7 @@ pub(crate) async fn sign_index(
                 "derived_from": derived_from,
                 "metadata": metadata,
                 "selection": false,
-                "signals": {"families": families},
+                "signals": {"families": families, "ratings": ratings},
                 "published_at": crate::contract::time(Timestamp::from_second(published_at).expect("a stored instant")),
             })
         })

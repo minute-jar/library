@@ -30,6 +30,14 @@ _Avoid_: Featured, verified, staff pick, certified
 The library account under which the operator shares the content it makes itself, marked as the software's publisher.
 _Avoid_: Official author, Minute Jar team, admin account
 
+**Rating** (FR: Note):
+From 1 to 5 stars given to a shared item under a library identifier that imported it, one per identifier, the last one counting.
+_Avoid_: Score, vote, like
+
+**Short Review** (FR: Avis court):
+The few words a family may leave with its rating, held until the review publishes it; not to be confused with the review itself.
+_Avoid_: Comment (from a library account), testimonial, feedback
+
 ### People
 
 **Minute Jar Account** (FR: Compte Minute Jar):

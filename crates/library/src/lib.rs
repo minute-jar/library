@@ -10,6 +10,7 @@ mod catalogue;
 mod http;
 mod imports;
 mod media;
+mod ratings;
 mod withdrawals;
 
 use std::sync::Arc;
@@ -24,6 +25,7 @@ use crate::contract::SigningKey;
 pub use crate::catalogue::PublishError;
 pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
+pub use crate::ratings::{ItemRatings, REVIEW_LENGTH, RatingError, Review};
 pub use crate::withdrawals::{Reason, WithdrawError, Withdrawal};
 
 /// A question bank or a learning path.
@@ -142,6 +144,26 @@ impl Library {
         item: &str,
     ) -> Result<(), ImportError> {
         imports::record(&self.pool, library_identifier, item).await
+    }
+
+    /// Records the rating of `stars`, from 1 to 5, and the short review if
+    /// any, that the family server under `library_identifier` gives the
+    /// shared item `item`, which it must have imported. It replaces the
+    /// identifier's earlier rating of the item; the index counts it from the
+    /// next time it is signed, and the review shows once published.
+    pub async fn record_rating(
+        &self,
+        library_identifier: &str,
+        item: &str,
+        stars: u8,
+        review: Option<&str>,
+    ) -> Result<(), RatingError> {
+        ratings::record(&self.pool, library_identifier, item, stars, review).await
+    }
+
+    /// How the shared item `item` is rated now, with its published reviews.
+    pub async fn item_ratings(&self, item: &str) -> Result<ItemRatings, RatingError> {
+        ratings::of_item(&self.pool, item).await
     }
 
     /// Withdraws a shared item, or one of its versions when `version` is

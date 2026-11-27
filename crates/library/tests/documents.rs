@@ -91,7 +91,7 @@ async fn the_index_lists_every_shared_item_at_its_latest_version() {
                         "curriculum": {"country": "GB", "year": "Year 5", "topic": "Verb forms"}
                     },
                     "selection": false,
-                    "signals": {"families": 0},
+                    "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                     "published_at": "2026-11-26T09:00:00Z"
                 },
                 {
@@ -110,7 +110,7 @@ async fn the_index_lists_every_shared_item_at_its_latest_version() {
                         "curriculum": null
                     },
                     "selection": false,
-                    "signals": {"families": 0},
+                    "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                     "published_at": "2026-11-21T08:00:00Z"
                 }
             ]
