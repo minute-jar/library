@@ -2,10 +2,12 @@
 //!
 //! [`Library`] is the whole service as callers see it: what is published
 //! enters the catalogue, and [`Library::router`] serves the signed documents
-//! of the interface with family servers (`docs/specs/interface-v1.md`).
+//! of the interface with family servers (`docs/specs/interface-v1.md`) and
+//! the catalogue the website browses (`docs/specs/catalogue-api.md`).
 
 pub mod contract;
 
+mod browse;
 mod catalogue;
 mod http;
 mod imports;
@@ -196,6 +198,6 @@ impl Library {
 
     /// The HTTP interface.
     pub fn router(&self) -> axum::Router {
-        http::router(self.clone())
+        http::router(self.clone()).merge(browse::router(self.clone()))
     }
 }
