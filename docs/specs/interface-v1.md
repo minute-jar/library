@@ -298,7 +298,8 @@ Authorization: Bearer <session>
 
 - The answer is `200 {"prepared": {...}}`: the latest version with the accepted answers added to their questions, as the body of the share route (`item`, `type`, `title`, `metadata`, `content`, `media` in base64), which the website then sends to `POST /api/shares` with the same session. The new version goes through the review like any share, counts in the quota, and the accepted answers leave the suggestions once it is published.
 - Refusals: an item that is not one of the account's `404 {"error": "unknown_item"}`; no answer accepted `400 {"error": "bad_suggestion"}`; an answer that is not among the question's suggestions `409 {"error": "not_suggested"}`; signed out `401 signed_out`.
-- The share route takes the prepared body once it shares new versions of an account's own items (`item`, ticket 14, issue #15).
+- The prepared body is a new version of the item (`item`, see Shares, New versions): a derived work keeps its original there without naming it again.
+
 ## Reports
 
 A family server reports a shared item for a parent, under its library identifier:

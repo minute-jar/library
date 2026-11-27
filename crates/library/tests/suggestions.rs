@@ -412,3 +412,39 @@ async fn the_library_methods_record_and_read_suggestions_as_the_routes_do() {
         json!(["went", "goed"])
     );
 }
+
+#[tokio::test]
+async fn the_prepared_new_version_goes_through_the_share_route_and_leaves_the_suggestions() {
+    let (sharing, session, item) = shared().await;
+    let library = &sharing.library;
+    import(library, FAMILY_A, &item).await;
+    suggest(library, FAMILY_A, &item, 1, 1, &["goed", "has gone"]).await;
+    let accepted = accept(
+        &sharing,
+        &session,
+        &item,
+        json!([{"question": 1, "answers": ["goed"]}]),
+    )
+    .await;
+
+    let shared = sharing
+        .share(&session, accepted.json()["prepared"].clone())
+        .await;
+
+    assert_eq!(shared.status, StatusCode::CREATED, "{}", text(&shared));
+    assert_eq!(shared.json()["item"], json!(item));
+    assert_eq!(shared.json()["version"], 2);
+    let asked = sharing.reviewer.asked();
+    assert_eq!(asked.last().unwrap().version, 2);
+    assert_eq!(
+        asked.last().unwrap().content["questions"][0]["answers"],
+        json!(["went", "goed"])
+    );
+    let seen = suggestions(&sharing, &session).await;
+    assert_eq!(
+        seen.json()["items"][0]["questions"],
+        json!([{"question": 1, "prompt": "Past of 'go'", "answers": [
+            {"answer": "has gone", "families": 1}
+        ]}])
+    );
+}
