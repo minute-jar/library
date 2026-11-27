@@ -11,7 +11,7 @@ use serde_json::Value;
 use crate::Reason;
 
 /// A future a [`Reviewer`] answers.
-pub type ReviewFuture<'a> = Pin<Box<dyn Future<Output = io::Result<Review>> + Send + 'a>>;
+pub type ReviewFuture<'a> = Pin<Box<dyn Future<Output = io::Result<ReviewOutcome>> + Send + 'a>>;
 
 /// What is given to the review: one version of a shared item.
 #[derive(Debug, Clone, Copy)]
@@ -30,7 +30,7 @@ pub struct Submission<'a> {
 
 /// The outcome of the review.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Review {
+pub enum ReviewOutcome {
     /// Nothing found.
     Published,
     /// Something a moderator must look at, with what was found.

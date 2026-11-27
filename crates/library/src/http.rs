@@ -14,7 +14,9 @@ use serde::Deserialize;
 
 use crate::catalogue::{self, Stored, item_path};
 use crate::media;
-use crate::{FormalNotice, ImportError, Library, NewReport, Reason, ReportError, Reporter};
+use crate::{
+    FormalNotice, ImportError, Library, NewReport, RatingError, Reason, ReportError, Reporter,
+};
 
 const KEYS_CACHE: &str = "public, max-age=3600";
 const INDEX_CACHE: &str = "public, max-age=300";
@@ -30,9 +32,11 @@ pub fn router(library: Library) -> Router {
         .route("/v1/items/{item}/versions/{version}", get(item_version))
         .route("/v1/withdrawals", get(withdrawals))
         .route("/v1/imports", post(import))
+        .route("/v1/ratings", post(rate))
+        .route("/api/items/{item}/ratings", get(item_ratings))
         .route("/v1/media/{digest}", get(medium))
         .route("/v1/reports", post(family_report))
-        .route("/v1/website/reports", post(website_report))
+        .route("/api/reports", post(website_report))
         .route("/v1/reports/{report}", get(report_state))
         .with_state(library)
 }
@@ -249,6 +253,61 @@ async fn report_state(State(library): State<Library>, Path(report): Path<String>
         .to_string(),
     )
         .into_response()
+}
+
+/// A rating left by a family server, under its library identifier carried
+/// in the body only, as for an import.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Rating {
+    library_identifier: String,
+    item: String,
+    stars: u8,
+    #[serde(default)]
+    review: Option<String>,
+}
+
+async fn rate(State(library): State<Library>, body: Bytes) -> Response {
+    let Ok(rating) = serde_json::from_slice::<Rating>(&body) else {
+        return refused(StatusCode::BAD_REQUEST, "bad_request");
+    };
+    match library
+        .record_rating(
+            &rating.library_identifier,
+            &rating.item,
+            rating.stars,
+            rating.review.as_deref(),
+        )
+        .await
+    {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(error) => rating_refused(error),
+    }
+}
+
+/// How an item is rated, for the website's item page: counted as things
+/// stand, not as of the last signed index.
+async fn item_ratings(State(library): State<Library>, Path(item): Path<String>) -> Response {
+    match library.item_ratings(&item).await {
+        Ok(ratings) => axum::Json(serde_json::json!({
+            "item": item,
+            "ratings": ratings.counts,
+            "reviews": ratings.reviews,
+        }))
+        .into_response(),
+        Err(error) => rating_refused(error),
+    }
+}
+
+fn rating_refused(error: RatingError) -> Response {
+    match error {
+        RatingError::BadIdentifier => refused(StatusCode::BAD_REQUEST, "bad_library_identifier"),
+        RatingError::BadRating => refused(StatusCode::BAD_REQUEST, "bad_rating"),
+        RatingError::BadReview => refused(StatusCode::BAD_REQUEST, "bad_review"),
+        RatingError::UnknownItem => refused(StatusCode::NOT_FOUND, "unknown_item"),
+        RatingError::NotImported => refused(StatusCode::FORBIDDEN, "not_imported"),
+        RatingError::Database(_) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    }
 }
 
 async fn medium(

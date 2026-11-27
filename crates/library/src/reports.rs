@@ -24,7 +24,7 @@ use sqlx::{PgPool, Postgres, Transaction};
 use crate::catalogue::{is_item_id, sign_index};
 use crate::contract::SigningKey;
 use crate::imports::is_library_identifier;
-use crate::review::{Review, Reviewer, Submission};
+use crate::review::{ReviewOutcome, Reviewer, Submission};
 use crate::withdrawals::{self, Reason, Withdrawal};
 
 /// The longest details a reporter may write, in characters.
@@ -435,9 +435,9 @@ async fn urgent_effect(
         focus: Some(report.reason),
     };
     Ok(match desk.reviewer.review(submission).await {
-        Ok(Review::Published) => (Effect::Hidden, None),
-        Ok(Review::Held { findings }) => (Effect::SwitchedOff, Some(findings)),
-        Ok(Review::Refused { reasons }) => (Effect::SwitchedOff, Some(reasons)),
+        Ok(ReviewOutcome::Published) => (Effect::Hidden, None),
+        Ok(ReviewOutcome::Held { findings }) => (Effect::SwitchedOff, Some(findings)),
+        Ok(ReviewOutcome::Refused { reasons }) => (Effect::SwitchedOff, Some(reasons)),
         // A child may be at stake: the item is switched off until a moderator decides.
         Err(_) => (
             Effect::SwitchedOff,

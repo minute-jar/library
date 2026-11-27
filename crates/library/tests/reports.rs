@@ -13,8 +13,8 @@ use common::*;
 use jiff::Timestamp;
 use library::contract::Kind;
 use library::{
-    Decision, Library, Message, Notifier, NotifyFuture, Outcome, Reason, Review, ReviewFuture,
-    Reviewer, Submission,
+    Decision, Library, Message, Notifier, NotifyFuture, Outcome, Reason, ReviewFuture,
+    ReviewOutcome, Reviewer, Submission,
 };
 use serde_json::{Value, json};
 
@@ -30,12 +30,12 @@ type Asked = (String, u32, Option<Reason>);
 /// remembers what it was asked.
 #[derive(Clone)]
 struct FakeReviewer {
-    outcome: Arc<Mutex<Option<Review>>>,
+    outcome: Arc<Mutex<Option<ReviewOutcome>>>,
     asked: Arc<Mutex<Vec<Asked>>>,
 }
 
 impl FakeReviewer {
-    fn answering(outcome: Option<Review>) -> Self {
+    fn answering(outcome: Option<ReviewOutcome>) -> Self {
         FakeReviewer {
             outcome: Arc::new(Mutex::new(outcome)),
             asked: Arc::default(),
@@ -90,10 +90,10 @@ struct Moderated {
 /// A library holding the verbs bank and the fractions bank, whose reviewer
 /// finds nothing unless told otherwise.
 async fn moderated() -> Moderated {
-    moderated_with(Some(Review::Published)).await
+    moderated_with(Some(ReviewOutcome::Published)).await
 }
 
-async fn moderated_with(outcome: Option<Review>) -> Moderated {
+async fn moderated_with(outcome: Option<ReviewOutcome>) -> Moderated {
     let reviewer = FakeReviewer::answering(outcome);
     let notifier = FakeNotifier::default();
     let library = library()
@@ -233,7 +233,7 @@ async fn a_new_version_within_seven_days_closes_a_wrong_answer_as_corrected() {
     let id = report_id(
         &post_json(
             &moderated.library,
-            "/v1/website/reports",
+            "/api/reports",
             &json!({"item": VERBS, "reason": "unsuitable_content", "contact": "parent@example.org"}),
         )
         .await,
@@ -282,7 +282,7 @@ async fn a_website_reporter_who_leaves_an_address_is_acknowledged() {
     let id = report_id(
         &post_json(
             &moderated.library,
-            "/v1/website/reports",
+            "/api/reports",
             &json!({"item": FRACTIONS, "reason": "other", "details": "Spam", "contact": "parent@example.org"}),
         )
         .await,
@@ -290,7 +290,7 @@ async fn a_website_reporter_who_leaves_an_address_is_acknowledged() {
     report_id(
         &post_json(
             &moderated.library,
-            "/v1/website/reports",
+            "/api/reports",
             &json!({"item": FRACTIONS, "reason": "other"}),
         )
         .await,
@@ -334,7 +334,7 @@ fn listed(withdrawals: &Value) -> Vec<(String, String, String)> {
 
 #[tokio::test]
 async fn a_plausible_report_of_personal_data_switches_the_item_off_at_once() {
-    let moderated = moderated_with(Some(Review::Held {
+    let moderated = moderated_with(Some(ReviewOutcome::Held {
         findings: "A full name in question 1".into(),
     }))
     .await;
@@ -401,14 +401,14 @@ async fn an_implausible_report_hides_the_item_from_new_imports_only() {
 
 #[tokio::test]
 async fn a_rejected_report_puts_the_switched_off_item_back_by_itself() {
-    let moderated = moderated_with(Some(Review::Refused {
+    let moderated = moderated_with(Some(ReviewOutcome::Refused {
         reasons: "An explicit picture".into(),
     }))
     .await;
     let id = report_id(
         &post_json(
             &moderated.library,
-            "/v1/website/reports",
+            "/api/reports",
             &json!({"item": VERBS, "reason": "sexual_content", "contact": "parent@example.org"}),
         )
         .await,
@@ -489,7 +489,7 @@ async fn a_rejected_report_shows_a_hidden_item_again() {
 
 #[tokio::test]
 async fn an_upheld_report_withdraws_the_item_by_moderation() {
-    let moderated = moderated_with(Some(Review::Held {
+    let moderated = moderated_with(Some(ReviewOutcome::Held {
         findings: "An address".into(),
     }))
     .await;
@@ -560,7 +560,7 @@ async fn a_review_that_cannot_be_made_switches_the_item_off() {
 
 #[tokio::test]
 async fn a_report_never_turns_the_author_withdrawal_into_a_switch_off() {
-    let moderated = moderated_with(Some(Review::Held {
+    let moderated = moderated_with(Some(ReviewOutcome::Held {
         findings: "A name".into(),
     }))
     .await;
@@ -622,7 +622,7 @@ async fn a_formal_notice_hides_the_item_at_once() {
     let id = report_id(
         &post_json(
             &moderated.library,
-            "/v1/website/reports",
+            "/api/reports",
             &json!({
                 "item": VERBS,
                 "reason": "rights",
@@ -657,7 +657,7 @@ async fn a_website_rights_report_without_a_notice_does_not_hide_the_item() {
         report_id(
             &post_json(
                 &moderated.library,
-                "/v1/website/reports",
+                "/api/reports",
                 &json!({"item": VERBS, "reason": "rights"}),
             )
             .await,
@@ -704,25 +704,25 @@ async fn reports_are_refused_with_fixed_codes() {
             "bad_request",
         ),
         (
-            "/v1/website/reports",
+            "/api/reports",
             json!({"library_identifier": FAMILY_A, "item": VERBS, "reason": "other"}),
             StatusCode::BAD_REQUEST,
             "bad_request",
         ),
         (
-            "/v1/website/reports",
+            "/api/reports",
             json!({"item": VERBS, "reason": "other", "contact": "not an address"}),
             StatusCode::BAD_REQUEST,
             "bad_contact",
         ),
         (
-            "/v1/website/reports",
+            "/api/reports",
             json!({"item": VERBS, "reason": "other", "contact": "a@example.org", "notice": {"name": "A", "work": "B"}}),
             StatusCode::BAD_REQUEST,
             "bad_notice",
         ),
         (
-            "/v1/website/reports",
+            "/api/reports",
             json!({"item": VERBS, "reason": "rights", "notice": {"name": "A", "work": "B"}}),
             StatusCode::BAD_REQUEST,
             "bad_notice",
