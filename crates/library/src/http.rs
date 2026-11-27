@@ -14,7 +14,9 @@ use serde::Deserialize;
 
 use crate::catalogue::{self, Stored, item_path};
 use crate::media;
-use crate::{ImportError, Library, RatingError};
+use crate::{
+    FormalNotice, ImportError, Library, NewReport, RatingError, Reason, ReportError, Reporter,
+};
 
 const KEYS_CACHE: &str = "public, max-age=3600";
 const INDEX_CACHE: &str = "public, max-age=300";
@@ -33,6 +35,9 @@ pub fn router(library: Library) -> Router {
         .route("/v1/ratings", post(rate))
         .route("/api/items/{item}/ratings", get(item_ratings))
         .route("/v1/media/{digest}", get(medium))
+        .route("/v1/reports", post(family_report))
+        .route("/api/reports", post(website_report))
+        .route("/v1/reports/{report}", get(report_state))
         .with_state(library)
 }
 
@@ -101,6 +106,153 @@ async fn import(State(library): State<Library>, body: Bytes) -> Response {
         Err(ImportError::UnknownItem) => refused(StatusCode::NOT_FOUND, "unknown_item"),
         Err(ImportError::Database(_)) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
+}
+
+/// A report from a family server, under its library identifier, which
+/// travels in the body only, like an import's.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct FamilyReport {
+    library_identifier: String,
+    item: String,
+    reason: String,
+    #[serde(default)]
+    details: Option<String>,
+}
+
+/// A report from the website: anonymous, with an address for the
+/// acknowledgement and the decision if the reporter leaves one.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct WebsiteReport {
+    item: String,
+    reason: String,
+    #[serde(default)]
+    details: Option<String>,
+    #[serde(default)]
+    contact: Option<String>,
+    #[serde(default)]
+    notice: Option<Notice>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Notice {
+    name: String,
+    work: String,
+}
+
+async fn family_report(State(library): State<Library>, body: Bytes) -> Response {
+    let Ok(report) = serde_json::from_slice::<FamilyReport>(&body) else {
+        return refused(StatusCode::BAD_REQUEST, "bad_request");
+    };
+    let reporter = Reporter::Family {
+        library_identifier: report.library_identifier,
+    };
+    receive(
+        &library,
+        report.item,
+        &report.reason,
+        report.details,
+        reporter,
+    )
+    .await
+}
+
+async fn website_report(State(library): State<Library>, body: Bytes) -> Response {
+    let Ok(report) = serde_json::from_slice::<WebsiteReport>(&body) else {
+        return refused(StatusCode::BAD_REQUEST, "bad_request");
+    };
+    let reporter = Reporter::Website {
+        contact: report.contact,
+        notice: report.notice.map(|notice| FormalNotice {
+            name: notice.name,
+            work: notice.work,
+        }),
+    };
+    receive(
+        &library,
+        report.item,
+        &report.reason,
+        report.details,
+        reporter,
+    )
+    .await
+}
+
+async fn receive(
+    library: &Library,
+    item: String,
+    reason: &str,
+    details: Option<String>,
+    reporter: Reporter,
+) -> Response {
+    let Some(reason) = Reason::from_code(reason) else {
+        return refused(StatusCode::BAD_REQUEST, "bad_reason");
+    };
+    let Some(desk) = &library.reports else {
+        return refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable");
+    };
+    let now = (desk.clock)();
+    let report = NewReport {
+        item,
+        reason,
+        details,
+        reporter,
+    };
+    match library.report(report, now).await {
+        Ok(id) => (
+            StatusCode::ACCEPTED,
+            [
+                (header::CONTENT_TYPE, "application/json"),
+                (header::CACHE_CONTROL, "no-store"),
+            ],
+            serde_json::json!({"report": id}).to_string(),
+        )
+            .into_response(),
+        Err(ReportError::BadIdentifier) => {
+            refused(StatusCode::BAD_REQUEST, "bad_library_identifier")
+        }
+        Err(ReportError::BadContact) => refused(StatusCode::BAD_REQUEST, "bad_contact"),
+        Err(ReportError::BadNotice) => refused(StatusCode::BAD_REQUEST, "bad_notice"),
+        Err(ReportError::DetailsTooLong) => refused(StatusCode::BAD_REQUEST, "bad_request"),
+        Err(ReportError::UnknownItem) => refused(StatusCode::NOT_FOUND, "unknown_item"),
+        Err(ReportError::Unavailable | ReportError::Database(_)) => {
+            refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable")
+        }
+    }
+}
+
+/// Where a report stands, for its reporter, who alone knows its identifier.
+async fn report_state(State(library): State<Library>, Path(report): Path<String>) -> Response {
+    let state = match library.report_state(&report).await {
+        Ok(Some(state)) => state,
+        Ok(None) => return refused(StatusCode::NOT_FOUND, "unknown_report"),
+        Err(_) => return refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
+    };
+    let decision = state.decision.map(|(decision, decided_at)| {
+        serde_json::json!({
+            "outcome": decision.outcome.code(),
+            "reasons": decision.reasons,
+            "decided_at": crate::contract::time(decided_at),
+        })
+    });
+    (
+        [
+            (header::CONTENT_TYPE, "application/json"),
+            (header::CACHE_CONTROL, "no-store"),
+        ],
+        serde_json::json!({
+            "report": state.report,
+            "item": state.item,
+            "reason": state.reason.code(),
+            "status": state.status.code(),
+            "received_at": crate::contract::time(state.received_at),
+            "decision": decision,
+        })
+        .to_string(),
+    )
+        .into_response()
 }
 
 /// A rating left by a family server, under its library identifier carried
