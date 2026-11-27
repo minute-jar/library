@@ -170,6 +170,7 @@ pub(crate) async fn sign_index(
                       FROM generate_series(1, 5) AS s ORDER BY s)
          FROM item_versions AS v
          WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+           AND NOT EXISTS (SELECT 1 FROM hidden_items AS h WHERE h.item = v.item)
          ORDER BY item, version DESC",
     )
     .fetch_all(&mut **tx)

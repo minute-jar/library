@@ -21,10 +21,12 @@ const PAGE_CACHE: &str = "public, max-age=60";
 /// An item file holds the keys document, cached as long.
 const FILE_CACHE: &str = "public, max-age=3600";
 
-/// The versions of `item` that are not withdrawn.
+/// The versions of `item` that the catalogue shows: not withdrawn, and the
+/// item not hidden from new imports.
 const SHOWN: &str = "SELECT * FROM item_versions AS v
      WHERE item = $1
-       AND NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))";
+       AND NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
+       AND NOT EXISTS (SELECT 1 FROM hidden_items AS h WHERE h.item = v.item)";
 
 pub fn router(library: Library) -> Router {
     Router::new()

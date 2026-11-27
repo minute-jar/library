@@ -208,3 +208,42 @@ async fn no_file_for_a_withdrawn_or_unknown_version() {
         assert_eq!(answer.json(), json!({"error": error}), "{path}");
     }
 }
+
+/// A reviewer that finds every report implausible, and a notifier that sends nothing.
+struct Unconvinced;
+
+impl library::Reviewer for Unconvinced {
+    fn review<'a>(&'a self, _: library::Submission<'a>) -> library::ReviewFuture<'a> {
+        Box::pin(async { Ok(library::ReviewOutcome::Published) })
+    }
+}
+
+struct Silent;
+
+impl library::Notifier for Silent {
+    fn send<'a>(&'a self, _: &'a str, _: &'a library::Message) -> library::NotifyFuture<'a> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+#[tokio::test]
+async fn an_item_hidden_from_new_imports_has_no_page_and_no_file() {
+    let library = two_versions()
+        .await
+        .with_reports(Unconvinced, Silent, || at("2026-11-26T10:00:00Z"));
+    let reported = post_json(
+        &library,
+        "/v1/reports",
+        &json!({"library_identifier": FAMILY_A, "item": VERBS, "reason": "illegal_content", "details": "Question 1"}),
+    )
+    .await;
+    assert!(reported.status.is_success(), "{}", reported.json());
+
+    let page = get(&library, &format!("/api/items/{VERBS}")).await;
+    let file = get(&library, &format!("/api/items/{VERBS}/versions/2/file")).await;
+
+    assert_eq!(page.status, StatusCode::NOT_FOUND);
+    assert_eq!(page.json(), json!({"error": "unknown_item"}));
+    assert_eq!(file.status, StatusCode::NOT_FOUND);
+    assert_eq!(file.json(), json!({"error": "unknown_item"}));
+}

@@ -38,7 +38,7 @@ pub enum Reason {
 }
 
 impl Reason {
-    fn code(self) -> &'static str {
+    pub(crate) fn code(self) -> &'static str {
         match self {
             Reason::Rights => "rights",
             Reason::PersonalData => "personal_data",
@@ -48,6 +48,23 @@ impl Reason {
             Reason::WrongAnswer => "wrong_answer",
             Reason::Other => "other",
         }
+    }
+}
+
+impl Reason {
+    /// The reason a code names, as reports and the withdrawal list write it.
+    pub(crate) fn from_code(code: &str) -> Option<Reason> {
+        [
+            Reason::Rights,
+            Reason::PersonalData,
+            Reason::SexualContent,
+            Reason::IllegalContent,
+            Reason::UnsuitableContent,
+            Reason::WrongAnswer,
+            Reason::Other,
+        ]
+        .into_iter()
+        .find(|reason| reason.code() == code)
     }
 }
 
@@ -117,6 +134,22 @@ pub async fn withdraw(
     now: Timestamp,
 ) -> Result<(), WithdrawError> {
     let mut tx = begin(pool, item, version).await?;
+    insert(&mut tx, item, version, withdrawal, now).await?;
+    sign_index(&mut tx, signing, now).await?;
+    sign(&mut tx, signing, now).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Writes a withdrawal within a change of the catalogue already open, once
+/// the item or version is known; the caller signs the documents again.
+pub(crate) async fn insert(
+    tx: &mut Transaction<'_, Postgres>,
+    item: &str,
+    version: Option<u32>,
+    withdrawal: Withdrawal,
+    now: Timestamp,
+) -> Result<(), sqlx::Error> {
     let (kind, reason) = withdrawal.codes();
     sqlx::query(
         "INSERT INTO withdrawals (item, version, kind, reason, withdrawn_at) VALUES ($1, $2, $3, $4, $5)
@@ -128,11 +161,8 @@ pub async fn withdraw(
     .bind(kind)
     .bind(reason)
     .bind(now.as_second())
-    .execute(&mut *tx)
+    .execute(&mut **tx)
     .await?;
-    sign_index(&mut tx, signing, now).await?;
-    sign(&mut tx, signing, now).await?;
-    tx.commit().await?;
     Ok(())
 }
 
@@ -146,20 +176,30 @@ pub async fn reactivate(
     now: Timestamp,
 ) -> Result<(), WithdrawError> {
     let mut tx = begin(pool, item, version).await?;
-    let ended = sqlx::query(
-        "DELETE FROM withdrawals WHERE item = $1 AND version = $2 AND kind = 'switch_off'",
-    )
-    .bind(item)
-    .bind(stored(version))
-    .execute(&mut *tx)
-    .await?;
-    if ended.rows_affected() == 0 {
+    if !end_switch_off(&mut tx, item, version).await? {
         return Err(WithdrawError::NotSwitchedOff);
     }
     sign_index(&mut tx, signing, now).await?;
     sign(&mut tx, signing, now).await?;
     tx.commit().await?;
     Ok(())
+}
+
+/// Ends a switch-off within a change of the catalogue already open; answers
+/// whether the item or version was switched off. The caller signs again.
+pub(crate) async fn end_switch_off(
+    tx: &mut Transaction<'_, Postgres>,
+    item: &str,
+    version: Option<u32>,
+) -> Result<bool, sqlx::Error> {
+    let ended = sqlx::query(
+        "DELETE FROM withdrawals WHERE item = $1 AND version = $2 AND kind = 'switch_off'",
+    )
+    .bind(item)
+    .bind(stored(version))
+    .execute(&mut **tx)
+    .await?;
+    Ok(ended.rows_affected() > 0)
 }
 
 /// Signs the withdrawal list at `now`, as the catalogue stands.

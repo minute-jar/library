@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports and ratings. Reports, suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports, ratings and reports. Suggestions and shares are added by later tickets of `docs/tickets/step-1.md`.
 
 ## Signed documents
 
@@ -167,7 +167,7 @@ The library writes the file as one line, the two signed documents spliced in unc
 - the item is a valid signed shared item of contract `1`;
 - every listed medium is in `media`, and the SHA-256 of its bytes is its digest.
 
-A file cannot say whether the item was withdrawn since: a family server checks the withdrawal list the next time it reaches the library, as for any imported item. The library makes files only of versions the catalogue shows: a withdrawn item answers `404` with `{"error": "unknown_item"}`, a withdrawn or unknown version `404` with `{"error": "unknown_version"}`. A file is served with `Cache-Control: public, max-age=3600`, as long as the keys document it holds.
+A file cannot say whether the item was withdrawn since: a family server checks the withdrawal list the next time it reaches the library, as for any imported item. The library makes files only of versions the catalogue shows: a withdrawn item, or one hidden from new imports, answers `404` with `{"error": "unknown_item"}`, a withdrawn or unknown version `404` with `{"error": "unknown_version"}`. A file is served with `Cache-Control: public, max-age=3600`, as long as the keys document it holds.
 
 ## Withdrawals
 
@@ -251,6 +251,42 @@ GET /api/items/{item}/ratings
 - `ratings` is counted as things stand, not as of the last signed index.
 - `reviews` holds only published short reviews, highest rated first, with nothing that tells families apart: no identifier, no time.
 - An unknown item answers `404` with `{"error": "unknown_item"}`.
+
+## Reports
+
+A family server reports a shared item for a parent, under its library identifier:
+
+```
+POST /v1/reports
+Content-Type: application/json
+
+{"library_identifier": "<32 hex>", "item": "<32 hex>", "reason": "wrong_answer", "details": "Question 3: the past of 'go' is 'went'."}
+```
+
+The website sends the same report anonymously, through its unsigned API under `/api/` (not part of the family-server contract), with an e-mail address if the reporter wants the acknowledgement and the decision, and a rights holder's formal notice if there is one:
+
+```
+POST /api/reports
+Content-Type: application/json
+
+{"item": "<32 hex>", "reason": "rights", "details": "...", "contact": "rights@example.org",
+ "notice": {"name": "Example Publishing", "work": "English Grammar, Year 5"}}
+```
+
+- `reason` is one of `personal_data`, `sexual_content`, `illegal_content`, `rights`, `unsuitable_content`, `wrong_answer`, `other`, the codes of the withdrawal list. `details` (at most 2000 characters), `contact` and `notice` may be left out. A family server's report carries no `contact` and no `notice`; the website's carries no library identifier.
+- The answer is `202 Accepted` with `{"report": "<32 hex>"}`, `Cache-Control: no-store` and no cookie: the report's identifier, 128 random bits, is its acknowledgement. Only its reporter knows it, and the library keeps no link between it and the library identifier.
+- `GET /v1/reports/{report}` answers where the report stands, with `Cache-Control: no-store`:
+
+  ```json
+  {"report": "<32 hex>", "item": "<32 hex>", "reason": "personal_data", "status": "rejected",
+   "received_at": "2026-11-26T10:00:00Z",
+   "decision": {"outcome": "rejected", "reasons": "...", "decided_at": "2026-11-27T10:00:00Z"}}
+  ```
+
+  `status` is `with_author` (a wrong answer or unsuitable content the author has 7 days to correct), `with_moderator`, `corrected` (the author published a new version within 7 days), `upheld` or `rejected`; `decision` is `null` until a moderator decides. A family server polls it to tell the parent the decision; a website reporter who left an address receives the acknowledgement and the decision by e-mail, and the address is erased once the decision is sent.
+- What a report does at once: for `personal_data`, `sexual_content` or `illegal_content`, the item is reviewed again on that reason; if the report is plausible, or if two families that imported the item reported it for one of these reasons, the item is switched off (`kind` `switch_off` in the withdrawal list), otherwise it leaves the index while still served to the families that have it (hidden from new imports). For `rights`, the item is hidden from new imports once three distinct library identifiers that imported it reported it, or at once on a formal notice. Other reasons change nothing until a moderator decides.
+- A moderator's decision that upholds a report withdraws the item (`kind` `moderation`, with the report's reason); one that rejects it ends the switch-off or the hiding once no other report for the same reasons waits.
+- Refusals: a malformed identifier `400 {"error": "bad_library_identifier"}`; an unknown reason `400 {"error": "bad_reason"}`; a contact that is not an e-mail address `400 {"error": "bad_contact"}`; a notice without a name, a work or a contact, or for another reason than `rights`, `400 {"error": "bad_notice"}`; a body that is not the expected object, or details too long, `400 {"error": "bad_request"}`; an unknown item `404 {"error": "unknown_item"}`; an unknown report `404 {"error": "unknown_report"}`.
 
 ## HTTP
 

@@ -7,6 +7,9 @@
 //! - `LIBRARY_MEDIA_DIR`: the directory holding the media of shared items,
 //!   until the S3-compatible store is wired at deployment;
 //! - `LIBRARY_LISTEN`: the address to listen on, `127.0.0.1:8080` by default.
+//!
+//! Reports answer `503` until a review adapter (ticket 13) and a notifier
+//! are wired here with `Library::with_reports`.
 
 use std::time::Duration;
 

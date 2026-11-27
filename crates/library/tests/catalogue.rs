@@ -5,7 +5,10 @@ mod common;
 
 use axum::http::StatusCode;
 use common::*;
-use library::{Reason, Withdrawal};
+use library::{
+    Message, Notifier, NotifyFuture, Reason, ReviewFuture, ReviewOutcome, Reviewer, Submission,
+    Withdrawal,
+};
 use serde_json::json;
 
 #[tokio::test]
@@ -323,5 +326,49 @@ async fn an_entry_carries_the_signals_of_the_index() {
     assert_eq!(
         answer["items"][0]["signals"],
         json!({"families": 2, "ratings": [0, 0, 0, 1, 0]})
+    );
+}
+
+/// A reviewer that finds nothing.
+struct Clean;
+
+impl Reviewer for Clean {
+    fn review<'a>(&'a self, _: Submission<'a>) -> ReviewFuture<'a> {
+        Box::pin(async { Ok(ReviewOutcome::Published) })
+    }
+}
+
+/// A notifier that sends nothing.
+struct Silent;
+
+impl Notifier for Silent {
+    fn send<'a>(&'a self, _: &'a str, _: &'a Message) -> NotifyFuture<'a> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+#[tokio::test]
+async fn a_hidden_item_leaves_the_catalogue() {
+    let library = verbs_and_fractions()
+        .await
+        .with_reports(Clean, Silent, || at("2026-11-26T10:00:00Z"));
+
+    let answer = post_json(
+        &library,
+        "/api/reports",
+        &json!({
+            "item": VERBS,
+            "reason": "rights",
+            "details": "Copied from page 12.",
+            "contact": "rights@publisher.example",
+            "notice": {"name": "Example Publishing", "work": "English Grammar, Year 5"}
+        }),
+    )
+    .await;
+    assert_eq!(answer.status, StatusCode::ACCEPTED);
+
+    assert_eq!(
+        titles(&library, "/api/catalogue").await,
+        ["Les fractions, CM1"]
     );
 }
