@@ -270,7 +270,7 @@ Content-Type: application/json
 - `version` is the version the family uses; `question` the question's place in its `content.questions`, from 1, as in the review's reasons. The question must take answers (an `answers` array).
 - `answers` holds 1 to 10 answers, each trimmed, of 1 to 100 characters (Unicode scalar values) and without control characters. An answer the question already accepts is left out.
 - The answer is `204 No Content`, with no body and no cookie. Suggesting the same answer again changes nothing: each identifier counts once per answer.
-- Only an item the identifier reported importing can receive suggestions; otherwise `403 {"error": "not_imported"}`.
+- Only an item the identifier reported importing can receive suggestions; otherwise `403 {"error": "not_imported"}`. An item withdrawn whole, by its author or by moderation, or switched off, receives none: `409 {"error": "withdrawn_item"}`.
 - Refusals: `400 {"error": "bad_suggestion"}` for the answers; `404 {"error": "unknown_version"}`; `400 {"error": "unknown_question"}`; `bad_library_identifier`, `bad_request` and `unknown_item` as for imports. Like every `POST` under `/v1/`, it is refused with a session.
 - The library keeps with the identifier only the item, the version, the question and the answers, never a time, an address or an account. Suggestions are not public: only the item's author reads them, counted.
 
@@ -286,7 +286,7 @@ GET /api/account/suggestions
 ]}]}
 ```
 
-- Only the account's items with suggestions are listed. Questions are numbered in the item's latest `version`; a suggestion for an earlier version follows its question there by its `prompt`, and is left out when no question of the latest version has that prompt. An answer the latest version accepts is no longer suggested.
+- Only the account's items with suggestions are listed, and none withdrawn whole or switched off. Questions are numbered in the item's latest `version`; a suggestion for an earlier version follows its question there by its `prompt`, and is left out when no question of the latest version has that prompt. An answer the latest version accepts is no longer suggested.
 - `families` counts the distinct library identifiers that suggested the answer; the answers come most suggested first. No identifier is ever shown.
 
 The author accepts some of them into a new version:

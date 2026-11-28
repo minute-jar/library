@@ -448,3 +448,49 @@ async fn the_prepared_new_version_goes_through_the_share_route_and_leaves_the_su
         ]}])
     );
 }
+
+/// Withdraws `item` by its author's choice, through the author's route.
+async fn withdrawn_by_its_author(sharing: &Sharing, session: &str, item: &str) {
+    let withdrawn = with_session(
+        &sharing.library,
+        "POST",
+        &format!("/api/account/items/{item}/withdrawal"),
+        session,
+        Some(json!({"version": null})),
+    )
+    .await;
+    assert_eq!(withdrawn.status, StatusCode::OK, "{}", text(&withdrawn));
+}
+
+#[tokio::test]
+async fn a_withdrawn_item_receives_no_suggestion() {
+    let (sharing, session, item) = shared().await;
+    let library = &sharing.library;
+    import(library, FAMILY_A, &item).await;
+    withdrawn_by_its_author(&sharing, &session, &item).await;
+
+    let answer = suggest(library, FAMILY_A, &item, 1, 1, &["goed"]).await;
+
+    assert_eq!(answer.status, StatusCode::CONFLICT);
+    assert_eq!(answer.json(), json!({"error": "withdrawn_item"}));
+    assert!(matches!(
+        library
+            .record_suggestion(FAMILY_A, &item, 1, 1, &["goed"])
+            .await,
+        Err(library::SuggestionError::WithdrawnItem)
+    ));
+}
+
+#[tokio::test]
+async fn the_author_no_longer_sees_the_suggestions_of_a_withdrawn_item() {
+    let (sharing, session, item) = shared().await;
+    let library = &sharing.library;
+    import(library, FAMILY_A, &item).await;
+    suggest(library, FAMILY_A, &item, 1, 1, &["goed"]).await;
+    withdrawn_by_its_author(&sharing, &session, &item).await;
+
+    let seen = suggestions(&sharing, &session).await;
+
+    assert_eq!(seen.status, StatusCode::OK, "{}", text(&seen));
+    assert_eq!(seen.json(), json!({"items": []}));
+}

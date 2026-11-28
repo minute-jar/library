@@ -33,6 +33,7 @@ fn suggestion_refused(error: SuggestionError) -> Response {
         }
         SuggestionError::BadSuggestion => refused(StatusCode::BAD_REQUEST, "bad_suggestion"),
         SuggestionError::UnknownItem => refused(StatusCode::NOT_FOUND, "unknown_item"),
+        SuggestionError::WithdrawnItem => refused(StatusCode::CONFLICT, "withdrawn_item"),
         SuggestionError::UnknownVersion => refused(StatusCode::NOT_FOUND, "unknown_version"),
         SuggestionError::UnknownQuestion => refused(StatusCode::BAD_REQUEST, "unknown_question"),
         SuggestionError::NotImported => refused(StatusCode::FORBIDDEN, "not_imported"),
@@ -84,6 +85,12 @@ async fn of_account(State(library): State<Library>, headers: HeaderMap) -> Respo
     };
     let mut items = Vec::new();
     for (item, _) in authored {
+        // A withdrawn item's suggestions can no longer be accepted.
+        match super::is_withdrawn(&library.pool, &item).await {
+            Ok(false) => {}
+            Ok(true) => continue,
+            Err(_) => return suggestion_refused(SuggestionError::Unavailable),
+        }
         match library.item_suggestions(&item).await {
             Ok(Some(suggestions)) if !suggestions.questions.is_empty() => items.push(suggestions),
             Ok(_) => {}
