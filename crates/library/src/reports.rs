@@ -25,7 +25,7 @@ use crate::catalogue::{is_item_id, sign_index};
 use crate::contract::SigningKey;
 use crate::imports::is_library_identifier;
 use crate::moderation::{AppealDecision, AppealOutcome};
-use crate::review::{ReviewOutcome, Reviewer, Submission};
+use crate::review::{ReviewOutcome, ReviewProvider, Submission};
 use crate::withdrawals::{self, Reason, Withdrawal};
 
 /// The longest details a reporter may write, in characters.
@@ -58,6 +58,14 @@ pub enum Reporter {
     Website {
         contact: Option<String>,
         /// A rights holder's formal notice; it needs `contact`.
+        notice: Option<FormalNotice>,
+    },
+    /// Someone on the website signed in with a library account whose card
+    /// is verified: their report of a child's personal data, sexual or
+    /// illegal content switches the item off at once. The report keeps no
+    /// link to the account.
+    VerifiedAccount {
+        contact: Option<String>,
         notice: Option<FormalNotice>,
     },
 }
@@ -93,7 +101,7 @@ pub enum ReportError {
     /// Details longer than [`DETAILS_LIMIT`].
     DetailsTooLong,
     UnknownItem,
-    /// The service was opened without a reviewer and a notifier.
+    /// The service was opened without a review provider and a notifier.
     Unavailable,
     Database(sqlx::Error),
 }
@@ -294,10 +302,10 @@ pub trait Notifier: Send + Sync + 'static {
     fn send<'a>(&'a self, to: &'a str, message: &'a Message) -> NotifyFuture<'a>;
 }
 
-/// What the service needs to receive reports: the reviewer, the notifier,
+/// What the service needs to receive reports: the provider, the notifier,
 /// and the clock the HTTP routes read the instant from.
 pub struct Desk {
-    pub reviewer: Box<dyn Reviewer>,
+    pub provider: Box<dyn ReviewProvider>,
     pub notifier: Box<dyn Notifier>,
     pub clock: Box<dyn Fn() -> Timestamp + Send + Sync>,
 }
@@ -329,7 +337,7 @@ fn check(report: &NewReport) -> Result<(), ReportError> {
                 return Err(ReportError::BadIdentifier);
             }
         }
-        Reporter::Website { contact, notice } => {
+        Reporter::Website { contact, notice } | Reporter::VerifiedAccount { contact, notice } => {
             if contact
                 .as_deref()
                 .is_some_and(|contact| !is_contact(contact))
@@ -431,6 +439,12 @@ async fn urgent_effect(
     if withdrawn_whole(pool, &report.item).await? {
         return Ok((Effect::None, None));
     }
+    if let Reporter::VerifiedAccount { .. } = report.reporter {
+        return Ok((
+            Effect::SwitchedOff,
+            Some("reported by a verified library account".into()),
+        ));
+    }
     if families(pool, &report.item, &URGENT, identifier).await? >= URGENT_FAMILIES {
         return Ok((
             Effect::SwitchedOff,
@@ -452,7 +466,7 @@ async fn urgent_effect(
         content: &content,
         focus: Some(report.reason),
     };
-    Ok(match desk.reviewer.review(submission).await {
+    Ok(match desk.provider.review(submission).await {
         Ok(ReviewOutcome::Published) => (Effect::Hidden, None),
         Ok(ReviewOutcome::Held { findings }) => (Effect::SwitchedOff, Some(findings)),
         Ok(ReviewOutcome::Refused { reasons }) => (
@@ -496,10 +510,12 @@ pub async fn receive(
     let latest = latest.ok_or(ReportError::UnknownItem)?;
     let identifier = match &report.reporter {
         Reporter::Family { library_identifier } => Some(library_identifier.as_str()),
-        Reporter::Website { .. } => None,
+        Reporter::Website { .. } | Reporter::VerifiedAccount { .. } => None,
     };
     let (contact, notice) = match &report.reporter {
-        Reporter::Website { contact, notice } => (contact.clone(), notice.clone()),
+        Reporter::Website { contact, notice } | Reporter::VerifiedAccount { contact, notice } => {
+            (contact.clone(), notice.clone())
+        }
         Reporter::Family { .. } => (None, None),
     };
 

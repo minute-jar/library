@@ -5,8 +5,7 @@
 // reviews like any share.
 
 import { LIBRARY_API } from '$app/env/private';
-import { Refused } from './accounts.ts';
-import { Unavailable } from './catalogue.ts';
+import { caller } from './api.ts';
 import type { Share } from './shares.ts';
 
 /** An answer and how many families suggested it. */
@@ -36,31 +35,14 @@ export type Accepted = { question: number; answers: string[] };
 export type Prepared = Record<string, unknown> & { item: string; title: string };
 
 export function suggestions(fetch: typeof globalThis.fetch, root: string = LIBRARY_API) {
-	async function call<T>(method: string, path: string, session: string, body?: unknown) {
-		const headers: Record<string, string> = { authorization: `Bearer ${session}` };
-		if (body !== undefined) headers['content-type'] = 'application/json';
-		let response: Response;
-		try {
-			response = await fetch(new URL(path, root), {
-				method,
-				headers,
-				body: body === undefined ? undefined : JSON.stringify(body)
-			});
-		} catch (cause) {
-			throw new Unavailable('the suggestions API is unreachable', { cause });
-		}
-		if (response.status >= 500)
-			throw new Unavailable(`the suggestions API answered ${response.status}`);
-		const answer = (await response.json()) as T & { error?: string };
-		if (!response.ok) throw new Refused(response.status, answer.error ?? 'bad_request');
-		return answer;
-	}
+	const call = caller(fetch, root, 'suggestions');
 
 	return {
 		/** The suggestions of the session's items that have any. */
 		async received(session: string) {
-			return (await call<{ items: ItemSuggestions[] }>('GET', '/api/account/suggestions', session))
-				.items;
+			return (
+				await call<{ items: ItemSuggestions[] }>('GET', '/api/account/suggestions', { session })
+			).items;
 		},
 		/**
 		 * Accepts `accepted` into a new version of `item` and shares it: the
@@ -70,10 +52,9 @@ export function suggestions(fetch: typeof globalThis.fetch, root: string = LIBRA
 			const { prepared } = await call<{ prepared: Prepared }>(
 				'POST',
 				`/api/account/items/${encodeURIComponent(item)}/suggestions/accept`,
-				session,
-				{ accepted }
+				{ session, body: { accepted } }
 			);
-			return call<Share>('POST', '/api/shares', session, prepared);
+			return call<Share>('POST', '/api/shares', { session, body: prepared });
 		}
 	};
 }

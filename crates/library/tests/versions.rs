@@ -42,7 +42,7 @@ async fn an_author_shares_a_new_version_of_their_item_reviewed_again() {
     let answer = shared.json();
     assert_eq!(answer["item"], item.as_str());
     assert_eq!(answer["version"], 2);
-    let asked = sharing.reviewer.asked();
+    let asked = sharing.review_provider.asked();
     assert_eq!(asked.len(), 2, "every version is reviewed");
     assert_eq!(asked[1].item, item);
     assert_eq!(asked[1].version, 2);
@@ -115,7 +115,7 @@ async fn decide(sharing: &Sharing, share: &Value, outcome: HeldOutcome, reasons:
 }
 
 fn held_for_a_moderator(sharing: &Sharing) {
-    sharing.reviewer.answer(Some(ReviewOutcome::Held {
+    sharing.review_provider.answer(Some(ReviewOutcome::Held {
         findings: "Question 2 may name a school.".into(),
     }));
 }
@@ -140,7 +140,7 @@ async fn only_the_authors_account_adds_a_version_to_an_item() {
     assert_eq!(unknown.json(), json!({"error": "unknown_item"}));
 
     assert_eq!(
-        sharing.reviewer.asked().len(),
+        sharing.review_provider.asked().len(),
         1,
         "refused before the review"
     );
@@ -180,7 +180,7 @@ async fn a_new_version_refused_by_a_moderator_leaves_the_item_its_author() {
         .await;
     assert_eq!(held.status, StatusCode::ACCEPTED, "{}", text(&held));
     assert_eq!(held.json()["item"], item.as_str());
-    assert_eq!(sharing.reviewer.asked()[1].version, 2);
+    assert_eq!(sharing.review_provider.asked()[1].version, 2);
 
     decide(
         &sharing,
@@ -190,7 +190,9 @@ async fn a_new_version_refused_by_a_moderator_leaves_the_item_its_author() {
     )
     .await;
 
-    sharing.reviewer.answer(Some(ReviewOutcome::Published));
+    sharing
+        .review_provider
+        .answer(Some(ReviewOutcome::Published));
     let shared = sharing
         .share(&session, new_version_of(&item, "Verbs, corrected"))
         .await;
@@ -366,7 +368,7 @@ async fn a_derived_work_names_an_original_the_catalogue_shows() {
     );
     assert_eq!(refused.json(), json!({"error": "bad_original"}));
     assert_eq!(
-        sharing.reviewer.asked().len(),
+        sharing.review_provider.asked().len(),
         2,
         "refused before the review"
     );

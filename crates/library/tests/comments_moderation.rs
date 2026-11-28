@@ -131,7 +131,12 @@ async fn a_moderator_publishes_a_held_comment() {
     let figures = ask(&commenting, "/api/moderation/figures/2026", &alice, None).await;
     assert_eq!(
         figures.json()["decisions"],
-        json!([{"reason": "personal_data", "outcome": "rejected", "count": 1}])
+        json!([]),
+        "no report was decided"
+    );
+    assert_eq!(
+        figures.json()["reviews"],
+        json!([{"case": "held_comment", "reason": "personal_data", "outcome": "published", "count": 1}])
     );
 }
 
@@ -310,7 +315,7 @@ async fn a_moderator_who_upholds_a_report_of_a_comment_removes_it() {
     let figures = ask(&commenting, "/api/moderation/figures/2026", &alice, None).await;
     assert_eq!(
         figures.json()["decisions"],
-        json!([{"reason": "other", "outcome": "upheld", "count": 1}])
+        json!([{"case": "comment_report", "reason": "other", "outcome": "upheld", "count": 1}])
     );
     let decided_again = ask(
         &commenting,
@@ -362,12 +367,12 @@ async fn a_report_of_a_comment_names_a_reason_and_a_published_comment() {
 }
 
 #[tokio::test]
-async fn the_history_of_an_item_leaves_out_its_comments() {
+async fn the_timeline_of_an_item_leaves_out_its_comments() {
     let (commenting, lark, alice) = moderated().await;
     let comment = published(&commenting, &lark).await;
     report(&commenting, &comment, json!({"reason": "other"})).await;
 
-    let history = ask(
+    let timeline = ask(
         &commenting,
         &format!("/api/moderation/items/{VERBS}"),
         &alice,
@@ -375,5 +380,5 @@ async fn the_history_of_an_item_leaves_out_its_comments() {
     )
     .await;
 
-    assert_eq!(history.json()["history"], json!([]));
+    assert_eq!(timeline.json()["timeline"], json!([]));
 }

@@ -23,7 +23,7 @@ A shared item made by changing another one, which keeps the original's attributi
 _Avoid_: Fork, remix, copy
 
 **Selection** (FR: Sélection):
-The mark on a shared item that the operator's team has read and chosen.
+The mark on a shared item that the operator's team has read and chosen; the editorial account's items carry it by right.
 _Avoid_: Featured, verified, staff pick, certified
 
 **Editorial Account** (FR: Compte éditorial):
@@ -65,7 +65,7 @@ A parent who has shared an item from their library account and answers for it.
 _Avoid_: Publisher, creator, contributor, uploader
 
 **Author Profile** (FR: Profil d'auteur):
-The page showing an author's shared items under their pseudonym of now and how many families use them, the same for everyone, to which the author alone sees the suggestions received added.
+The page showing an author's shared items under their pseudonym of now and how many families use them, the same for everyone, to which the author alone sees the suggestions received added; items shared under an earlier pseudonym show only if the author chooses it.
 _Avoid_: Library account, user page, portfolio
 
 **Sharing Terms** (FR: Conditions de partage):

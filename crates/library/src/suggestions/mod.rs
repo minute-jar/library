@@ -41,6 +41,9 @@ pub enum SuggestionError {
     BadSuggestion,
     /// No shared item has this identifier.
     UnknownItem,
+    /// The item is withdrawn, by its author or by moderation, or switched
+    /// off: it receives no suggestion.
+    WithdrawnItem,
     /// The item has no such version.
     UnknownVersion,
     /// The version has no such question, or the question takes no answers.
@@ -118,6 +121,16 @@ async fn content_of(pool: &PgPool, item: &str, version: u32) -> Result<Option<Va
     Ok(row.map(|(content,)| content))
 }
 
+/// Whether the whole of `item` is withdrawn or switched off.
+pub(crate) async fn is_withdrawn(pool: &PgPool, item: &str) -> Result<bool, sqlx::Error> {
+    let (withdrawn,): (bool,) =
+        sqlx::query_as("SELECT EXISTS (SELECT 1 FROM withdrawals WHERE item = $1 AND version = 0)")
+            .bind(item)
+            .fetch_one(pool)
+            .await?;
+    Ok(withdrawn)
+}
+
 pub(crate) async fn record(
     pool: &PgPool,
     identifier: &str,
@@ -139,6 +152,9 @@ pub(crate) async fn record(
     }
     if !is_item_id(item) || !has_item(pool, item).await? {
         return Err(SuggestionError::UnknownItem);
+    }
+    if is_withdrawn(pool, item).await? {
+        return Err(SuggestionError::WithdrawnItem);
     }
     let (imported,): (bool,) = sqlx::query_as(
         "SELECT EXISTS (SELECT 1 FROM imports WHERE library_identifier = $1 AND item = $2)",

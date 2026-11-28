@@ -106,6 +106,53 @@ async fn other_accounts_items_are_not_editorial() {
         json!({"pseudonym": "Owl", "editorial": false})
     );
     assert_eq!(item_page(&sharing, &item).await["editorial"], Value::Null);
+    assert_eq!(
+        index_entry(&sharing, &item).await["selection"],
+        false,
+        "a team member's own account gets no Selection mark by right"
+    );
+}
+
+#[tokio::test]
+async fn the_editorial_accounts_items_are_marked_selection_from_their_publication() {
+    let (sharing, session) = editorial().await;
+
+    let item = published(&sharing, &session, read_by_operator()).await;
+
+    assert_eq!(index_entry(&sharing, &item).await["selection"], true);
+    assert_eq!(
+        catalogue_entry(&sharing, "?selection=true", &item).await["selection"],
+        true
+    );
+    assert_eq!(item_page(&sharing, &item).await["selection"], true);
+}
+
+#[tokio::test]
+async fn moderators_see_that_an_editorial_item_is_selection_by_right() {
+    let (sharing, editions) = editorial().await;
+    sharing
+        .library
+        .grant_moderator(HERON, "Heron", sharing.clock.now())
+        .await
+        .unwrap();
+    let moderator = session(
+        &sharing.library,
+        &sharing.provider,
+        passkey(HERON, sharing.clock.now()),
+    )
+    .await;
+    let item = published(&sharing, &editions, read_by_operator()).await;
+
+    let removed = selection(&sharing, "DELETE", &moderator, &item).await;
+    let path = format!("/api/moderation/items/{item}");
+    let timeline = with_session(&sharing.library, "GET", &path, &moderator, None).await;
+
+    assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    assert_eq!(
+        timeline.json()["selection"],
+        json!({"moderator": null, "selected_at": "2026-11-27T10:00:00Z"})
+    );
+    assert_eq!(index_entry(&sharing, &item).await["selection"], true);
 }
 
 #[tokio::test]
@@ -157,7 +204,10 @@ async fn an_editorial_share_names_a_moderator_and_a_past_instant() {
         assert_eq!(shared.status, StatusCode::BAD_REQUEST, "{read}");
         assert_eq!(shared.json(), json!({"error": "bad_reading"}), "{read}");
     }
-    assert!(sharing.reviewer.asked().is_empty(), "nothing was reviewed");
+    assert!(
+        sharing.review_provider.asked().is_empty(),
+        "nothing was reviewed"
+    );
 }
 
 #[tokio::test]
@@ -240,9 +290,11 @@ async fn a_held_editorial_share_keeps_its_marks_once_a_moderator_publishes_it() 
         .grant_moderator("moderator-heron-subject", "Heron", sharing.clock.now())
         .await
         .unwrap();
-    sharing.reviewer.answer(Some(library::ReviewOutcome::Held {
-        findings: "Question 1 may be wrong.".into(),
-    }));
+    sharing
+        .review_provider
+        .answer(Some(library::ReviewOutcome::Held {
+            findings: "Question 1 may be wrong.".into(),
+        }));
     let shared = sharing.share(&session, read_by_operator()).await;
     assert_eq!(shared.status, StatusCode::ACCEPTED, "{}", text(&shared));
     let shared = shared.json();
@@ -266,6 +318,8 @@ async fn a_held_editorial_share_keeps_its_marks_once_a_moderator_publishes_it() 
     let page = item_page(&sharing, item).await;
     assert_eq!(page["author"]["editorial"], true);
     assert_eq!(page["editorial"]["read"]["by"], "operator");
+    assert_eq!(page["selection"], true);
+    assert_eq!(index_entry(&sharing, item).await["selection"], true);
 }
 
 const HERON: &str = "moderator-heron-subject";
@@ -426,7 +480,7 @@ async fn only_an_item_the_catalogue_shows_is_marked_selection() {
 }
 
 #[tokio::test]
-async fn moderators_see_who_marked_an_item_selection_in_its_history() {
+async fn moderators_see_who_marked_an_item_selection_in_its_timeline() {
     let (sharing, moderator, item) = with_item().await;
     let path = format!("/api/moderation/items/{item}");
     let before = with_session(&sharing.library, "GET", &path, &moderator, None).await;

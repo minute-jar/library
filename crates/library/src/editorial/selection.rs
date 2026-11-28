@@ -1,7 +1,8 @@
 //! The Selection mark: the items the operator's team read and chose
 //! (`docs/specs/moderation-api.md`, Selection). Moderators set and remove
-//! it; the index carries it as `selection`, and is signed again whenever it
-//! changes.
+//! it; the editorial account's items carry it by right, from their
+//! publication (`docs/specs/library-service.md`, Editorial account and seeding). The
+//! index carries it as `selection`, and is signed again whenever it changes.
 
 use axum::Router;
 use axum::extract::{Path, State};
@@ -14,6 +15,7 @@ use sqlx::PgPool;
 
 use crate::Library;
 use crate::accounts::http::signed_in;
+use crate::answers::{NO_STORE, refused};
 use crate::contract::SigningKey;
 
 /// Why the Selection mark could not be set or removed.
@@ -32,9 +34,10 @@ impl From<sqlx::Error> for SelectionError {
     }
 }
 
-/// The SQL of whether the index entry of `latest` (a version) is marked.
-pub(crate) const SELECTED: &str =
-    "EXISTS (SELECT 1 FROM selections WHERE selections.item = latest.item)";
+/// The SQL of whether the index entry of `latest` (a version) is marked:
+/// chosen by the team, or shared by the editorial account.
+pub(crate) const SELECTED: &str = "(latest.author_editorial
+     OR EXISTS (SELECT 1 FROM selections WHERE selections.item = latest.item))";
 
 /// Marks `item` Selection by the moderator `subject` at `now`; marking it
 /// again changes nothing.
@@ -107,14 +110,19 @@ async fn change(
     Ok(())
 }
 
-/// Who marked `item` Selection and when, as moderators read it; `null`
-/// when it is not marked.
+/// Who marked `item` Selection and when, as moderators read it: a
+/// moderator's handle, or `null` for an editorial item marked by right
+/// since its first publication; `null` when it is not marked.
 pub(crate) async fn of_item(pool: &PgPool, item: &str) -> Result<serde_json::Value, sqlx::Error> {
-    let row: Option<(String, i64)> =
-        sqlx::query_as("SELECT moderator, selected_at FROM selections WHERE item = $1")
-            .bind(item)
-            .fetch_optional(pool)
-            .await?;
+    let row: Option<(Option<String>, i64)> = sqlx::query_as(
+        "SELECT moderator, selected_at FROM selections WHERE item = $1
+         UNION ALL (SELECT NULL, published_at FROM item_versions
+                    WHERE item = $1 AND author_editorial ORDER BY version LIMIT 1)
+         LIMIT 1",
+    )
+    .bind(item)
+    .fetch_optional(pool)
+    .await?;
     Ok(match row {
         None => serde_json::Value::Null,
         Some((moderator, selected_at)) => json!({
@@ -147,20 +155,6 @@ async fn remove(
     headers: HeaderMap,
 ) -> Response {
     answer(&library, &headers, &item, false).await
-}
-
-const NO_STORE: &str = "private, no-store";
-
-fn refused(status: StatusCode, code: &str) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, NO_STORE),
-        ],
-        json!({"error": code}).to_string(),
-    )
-        .into_response()
 }
 
 /// Sets or removes the mark for the moderator a request comes from, signed

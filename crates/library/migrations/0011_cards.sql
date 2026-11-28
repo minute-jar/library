@@ -13,7 +13,7 @@ CREATE TABLE card_checks (
 
 -- The verified card of a library account: identification data, alongside
 -- `identifications`, answered by no route and kept for the same period
--- (ticket 26). `verified_by` is 'subscription' (the card of the subscription
+-- (issue #27). `verified_by` is 'subscription' (the card of the subscription
 -- of the same Minute Jar account) or 'check' (a zero-amount check). The same
 -- card may serve several accounts.
 CREATE TABLE identification_cards (

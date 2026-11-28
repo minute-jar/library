@@ -19,7 +19,8 @@ type ReportEvent = Parameters<typeof actions.report>[0];
 const lark = {
 	pseudonym: 'Lark',
 	minute_jar_account: 'separate' as const,
-	opened_at: '2026-11-27T10:00:00Z'
+	opened_at: '2026-11-27T10:00:00Z',
+	show_earlier_pseudonyms: false
 };
 
 function setUp() {

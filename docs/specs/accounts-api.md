@@ -43,8 +43,11 @@ The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is *
 An account, as its owner sees it:
 
 ```json
-{"pseudonym": "Owl", "minute_jar_account": "separate", "opened_at": "2026-11-27T10:00:00Z"}
+{"pseudonym": "Owl", "minute_jar_account": "separate", "opened_at": "2026-11-27T10:00:00Z",
+ "show_earlier_pseudonyms": false}
 ```
+
+`show_earlier_pseudonyms` is the owner's choice of what their public profile shows (`catalogue-api.md`, Author profiles): `false`, the default, keeps off it the items whose shared version carries an earlier pseudonym, and their pages lead to no profile; `true` shows them under the pseudonym of now.
 
 `minute_jar_account` is the choice made on the opening screen: `same_as_subscription` (one Minute Jar account for the library and hosted mode: the operator can join the pseudonym to the subscription, which lets the library account be linked to it) or `separate` (the person signs in to the library with another Minute Jar account, another e-mail address).
 
@@ -57,6 +60,7 @@ An account, as its owner sees it:
   - `403` `verified_email_required`: the provider gave no verified e-mail.
 - `GET /api/account` answers the account, or `404` `no_account`.
 - `PUT /api/account/pseudonym` with `{"pseudonym"}` changes it: `200` with the account; `bad_pseudonym`, `pseudonym_taken`, `no_account` as above.
+- `PUT /api/account/earlier-pseudonyms` with `{"shown": true | false}` sets `show_earlier_pseudonyms`: `200` with the account; `400` `bad_request` (not exactly that object), `no_account` as above.
 
 ### Closing
 
@@ -67,7 +71,7 @@ An account, as its owner sees it:
 - The items it shared stay published under their licence, with its pseudonym: their signed versions do not change.
 - Its pseudonym stays reserved: no account may take it again, without regard to case.
 - The library account is no longer joined to the Minute Jar account, whose next sign-in finds no account and may open another, under another pseudonym.
-- Its identification data, its identification and its verified card (`identification_cards`), is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Every share (`interface-v1.md`, Shares) records its instant in `identifications.last_shared_at`.
+- Its identification data, its identification and its verified card (`identification_cards`), is kept for the legal period after the last thing it published, a share or a comment, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, issue #27) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. A published comment is answered for like a share: the data is kept one year after the last one's publication (`comments.published_at`). An account that published nothing, neither a share nor a comment the review or a moderator published, has nothing to answer for: its identification data is erased at the next call. Every share (`interface-v1.md`, Shares) records its instant in `identifications.last_shared_at`.
 
 ## Card
 

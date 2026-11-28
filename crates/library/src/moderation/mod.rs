@@ -7,8 +7,8 @@ mod appeals;
 mod figures;
 pub(crate) mod http;
 
-pub use figures::Figures;
 pub(crate) use figures::of_year as figures;
+pub use figures::{CaseKind, Figures};
 
 pub use appeals::{
     APPEAL_PERIOD, Appeal, AppealDecision, AppealError, AppealOutcome, AppealState, AppealStatus,
@@ -296,19 +296,19 @@ pub enum Event {
     },
 }
 
-/// One moment of an item's history in moderation.
+/// One moment of an item's timeline in moderation.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HistoryEntry {
+pub struct TimelineEntry {
     pub at: Timestamp,
     pub event: Event,
 }
 
-/// An item's history in moderation, oldest first.
+/// An item's timeline in moderation, oldest first.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct History {
+pub struct Timeline {
     pub item: String,
     pub title: String,
-    pub entries: Vec<HistoryEntry>,
+    pub entries: Vec<TimelineEntry>,
 }
 
 pub(crate) fn instant(second: i64) -> Timestamp {
@@ -319,8 +319,8 @@ pub(crate) fn reason(code: &str) -> Reason {
     Reason::from_code(code).expect("a stored reason")
 }
 
-/// The history of `item` in moderation, if it exists.
-pub(crate) async fn history(pool: &PgPool, item: &str) -> Result<Option<History>, sqlx::Error> {
+/// The timeline of `item` in moderation, if it exists.
+pub(crate) async fn timeline(pool: &PgPool, item: &str) -> Result<Option<Timeline>, sqlx::Error> {
     let Some(title) = title(pool, item).await? else {
         return Ok(None);
     };
@@ -348,14 +348,14 @@ pub(crate) async fn history(pool: &PgPool, item: &str) -> Result<Option<History>
     let mut corrected = Vec::new();
     for (report, code, details, effect, findings, name, work, at, status, decided_at) in received {
         if let ("corrected", Some(decided_at)) = (status.as_str(), decided_at) {
-            corrected.push(HistoryEntry {
+            corrected.push(TimelineEntry {
                 at: instant(decided_at),
                 event: Event::Corrected {
                     report: report.clone(),
                 },
             });
         }
-        entries.push(HistoryEntry {
+        entries.push(TimelineEntry {
             at: instant(at),
             event: Event::Reported {
                 report,
@@ -379,7 +379,7 @@ pub(crate) async fn history(pool: &PgPool, item: &str) -> Result<Option<History>
     .fetch_all(pool)
     .await?;
     for (appeal, report, appellant, statement, at) in appealed {
-        entries.push(HistoryEntry {
+        entries.push(TimelineEntry {
             at: instant(at),
             event: Event::Appealed {
                 appeal,
@@ -400,7 +400,7 @@ pub(crate) async fn history(pool: &PgPool, item: &str) -> Result<Option<History>
     .await?;
     for (report, appeal, code, outcome, reasons, moderator, at) in decided {
         if let Some(appeal) = appeal {
-            entries.push(HistoryEntry {
+            entries.push(TimelineEntry {
                 at: instant(at),
                 event: Event::AppealDecided {
                     appeal,
@@ -412,7 +412,7 @@ pub(crate) async fn history(pool: &PgPool, item: &str) -> Result<Option<History>
             });
             continue;
         }
-        entries.push(HistoryEntry {
+        entries.push(TimelineEntry {
             at: instant(at),
             event: Event::Decided {
                 report,
@@ -429,7 +429,7 @@ pub(crate) async fn history(pool: &PgPool, item: &str) -> Result<Option<History>
     }
     entries.extend(corrected);
     entries.sort_by_key(|entry| entry.at);
-    Ok(Some(History {
+    Ok(Some(Timeline {
         item: item.to_string(),
         title,
         entries,

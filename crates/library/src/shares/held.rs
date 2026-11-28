@@ -75,6 +75,15 @@ pub enum HeldOutcome {
     Refused,
 }
 
+impl HeldOutcome {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            HeldOutcome::Published => "published",
+            HeldOutcome::Refused => "refused",
+        }
+    }
+}
+
 /// A moderator's decision on a held share: the rule the findings were
 /// about, and the reasons, which the author reads when it is refused.
 #[derive(Debug, Clone, PartialEq, Eq)]

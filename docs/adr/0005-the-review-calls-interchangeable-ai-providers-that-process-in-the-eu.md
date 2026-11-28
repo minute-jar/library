@@ -13,6 +13,6 @@ The service knows the review only through one interface: a shared item's version
 
 ## Consequences
 
-- Tests use a fake reviewer; no test calls a provider.
+- Tests use a fake review provider; no test calls a provider.
 - The models chosen and their detailed instructions are operating configuration, outside this repository (spec).
 - Other adapters (Mistral AI, a model reached through an EU region of a cloud provider) can be added as configuration needs them.

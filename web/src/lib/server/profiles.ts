@@ -4,7 +4,7 @@
 // which adds the suggestions received.
 
 import { LIBRARY_API } from '$app/env/private';
-import { Refused } from './accounts.ts';
+import { Refused, caller } from './api.ts';
 import { type Entry, Unavailable } from './catalogue.ts';
 import { NotFound } from './items.ts';
 
@@ -33,35 +33,23 @@ export type OwnProfile = Omit<Profile, 'items'> & {
 };
 
 export function profiles(fetch: typeof globalThis.fetch, root: string = LIBRARY_API) {
-	async function call(path: string, session?: string): Promise<Response> {
-		let response: Response;
-		try {
-			response = await fetch(new URL(path, root), {
-				headers: session ? { authorization: `Bearer ${session}` } : {}
-			});
-		} catch (cause) {
-			throw new Unavailable('the profiles API is unreachable', { cause });
-		}
-		if (response.status >= 500) {
-			throw new Unavailable(`the profiles API answered ${response.status}`);
-		}
-		return response;
-	}
+	const call = caller(fetch, root, 'profiles');
 
 	return {
 		/** The profile of the author holding `pseudonym`; `NotFound` when there is none. */
 		async public(pseudonym: string): Promise<Profile> {
-			const response = await call(`/api/authors/${encodeURIComponent(pseudonym)}`);
-			if (response.status === 404) throw new NotFound(pseudonym);
-			if (!response.ok) throw new Unavailable(`the profiles API answered ${response.status}`);
-			return (await response.json()) as Profile;
+			try {
+				return await call<Profile>('GET', `/api/authors/${encodeURIComponent(pseudonym)}`);
+			} catch (failure) {
+				if (failure instanceof Refused && failure.status === 404) throw new NotFound(pseudonym);
+				if (failure instanceof Refused)
+					throw new Unavailable(`the profiles API answered ${failure.status}`);
+				throw failure;
+			}
 		},
 		/** The session's own profile, with the suggestions received. */
-		async own(session: string): Promise<OwnProfile> {
-			const response = await call('/api/account/profile', session);
-			const answer = (await response.json()) as OwnProfile & { error?: string };
-			if (!response.ok) throw new Refused(response.status, answer.error ?? 'bad_request');
-			return answer;
+		own(session: string): Promise<OwnProfile> {
+			return call<OwnProfile>('GET', '/api/account/profile', { session });
 		}
 	};
 }

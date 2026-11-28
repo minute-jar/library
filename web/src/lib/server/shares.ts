@@ -4,8 +4,7 @@
 // happens in the parent app.
 
 import { LIBRARY_API } from '$app/env/private';
-import { Refused } from './accounts.ts';
-import { Unavailable } from './catalogue.ts';
+import { caller } from './api.ts';
 
 /** One reason the review refused a share for, per question. */
 export type RefusalReason = {
@@ -48,37 +47,17 @@ export type AuthorNotification = {
 };
 
 export function shares(fetch: typeof globalThis.fetch, root: string = LIBRARY_API) {
-	async function call<T>(method: string, path: string, session: string, body?: unknown) {
-		const headers: Record<string, string> = { authorization: `Bearer ${session}` };
-		if (body !== undefined) headers['content-type'] = 'application/json';
-		let response: Response;
-		try {
-			response = await fetch(new URL(path, root), {
-				method,
-				headers,
-				body: body === undefined ? undefined : JSON.stringify(body)
-			});
-		} catch (cause) {
-			throw new Unavailable('the sharing API is unreachable', { cause });
-		}
-		if (response.status >= 500)
-			throw new Unavailable(`the sharing API answered ${response.status}`);
-		const answer = (await response.json()) as T & { error?: string };
-		if (!response.ok) throw new Refused(response.status, answer.error ?? 'bad_request');
-		return answer;
-	}
+	const call = caller(fetch, root, 'sharing');
 
 	return {
 		standing(session: string) {
-			return call<Standing>('GET', '/api/account/shares', session);
+			return call<Standing>('GET', '/api/account/shares', { session });
 		},
 		async notifications(session: string) {
 			return (
-				await call<{ notifications: AuthorNotification[] }>(
-					'GET',
-					'/api/account/notifications',
+				await call<{ notifications: AuthorNotification[] }>('GET', '/api/account/notifications', {
 					session
-				)
+				})
 			).notifications;
 		},
 		/** The author's appeal of the decision on a report of their item. */
@@ -86,14 +65,16 @@ export function shares(fetch: typeof globalThis.fetch, root: string = LIBRARY_AP
 			return call<{ appeal: string }>(
 				'POST',
 				`/api/account/reports/${encodeURIComponent(report)}/appeal`,
-				session,
-				{ statement }
+				{ session, body: { statement } }
 			);
 		},
 		/** Accepts the sharing terms of `version`, the ones the page showed. */
 		accept(session: string, version: string) {
-			return call<Standing['sharing_terms']>('PUT', '/api/account/sharing-terms', session, {
-				version
+			return call<Standing['sharing_terms']>('PUT', '/api/account/sharing-terms', {
+				session,
+				body: {
+					version
+				}
 			});
 		}
 	};

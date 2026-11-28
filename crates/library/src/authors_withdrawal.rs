@@ -11,7 +11,7 @@
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use jiff::Timestamp;
@@ -22,6 +22,7 @@ use sqlx::PgPool;
 use crate::Library;
 use crate::accounts::Session;
 use crate::accounts::http::{Refusal, signed_in};
+use crate::answers::private as answer;
 use crate::contract::time;
 use crate::withdrawals::{self, WithdrawError, Withdrawal};
 
@@ -213,16 +214,4 @@ async fn items(State(library): State<Library>, headers: HeaderMap) -> Answer {
         }
     }
     Ok(answer(StatusCode::OK, json!({"items": listed})))
-}
-
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "private, no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
 }

@@ -10,7 +10,7 @@ use serde_json::Value;
 
 use crate::Reason;
 
-/// A future a [`Reviewer`] answers.
+/// A future a [`ReviewProvider`] answers.
 pub type ReviewFuture<'a> = Pin<Box<dyn Future<Output = io::Result<ReviewOutcome>> + Send + 'a>>;
 
 /// What is given to the review: one version of a shared item.
@@ -83,6 +83,6 @@ mod reason_code {
 
 /// Checks content by AI, through providers that process in the European
 /// Union and keep nothing (ADR-0005).
-pub trait Reviewer: Send + Sync + 'static {
+pub trait ReviewProvider: Send + Sync + 'static {
     fn review<'a>(&'a self, submission: Submission<'a>) -> ReviewFuture<'a>;
 }

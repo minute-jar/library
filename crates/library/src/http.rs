@@ -12,6 +12,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 
+use crate::answers::refused;
 use crate::catalogue::{self, Stored, item_path};
 use crate::media;
 use crate::{
@@ -159,16 +160,43 @@ async fn family_report(State(library): State<Library>, body: Bytes) -> Response 
     .await
 }
 
-async fn website_report(State(library): State<Library>, body: Bytes) -> Response {
+/// Whether the request carries the session of a library account whose
+/// card is verified. A missing or stale session, or accounts turned off,
+/// make an anonymous reporter, never a refusal.
+async fn verified_account(library: &Library, headers: &HeaderMap) -> bool {
+    let Ok((session, _)) = crate::accounts::http::signed_in(library, headers).await else {
+        return false;
+    };
+    let verified: Result<(bool,), _> = sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM library_accounts AS a
+                        JOIN identification_cards AS c ON c.account = a.id
+                        WHERE a.subject = $1)",
+    )
+    .bind(&session.subject)
+    .fetch_one(&library.pool)
+    .await;
+    matches!(verified, Ok((true,)))
+}
+
+/// A report from the website: anonymous, or with the session of a library
+/// account, which counts only when its card is verified.
+async fn website_report(
+    State(library): State<Library>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Response {
     let Ok(report) = serde_json::from_slice::<WebsiteReport>(&body) else {
         return refused(StatusCode::BAD_REQUEST, "bad_request");
     };
-    let reporter = Reporter::Website {
-        contact: report.contact,
-        notice: report.notice.map(|notice| FormalNotice {
-            name: notice.name,
-            work: notice.work,
-        }),
+    let contact = report.contact;
+    let notice = report.notice.map(|notice| FormalNotice {
+        name: notice.name,
+        work: notice.work,
+    });
+    let reporter = if verified_account(&library, &headers).await {
+        Reporter::VerifiedAccount { contact, notice }
+    } else {
+        Reporter::Website { contact, notice }
     };
     receive(
         &library,
@@ -359,14 +387,4 @@ fn served(stored: &Stored, cache: &'static str, request: &HeaderMap) -> Response
     } else {
         (headers, stored.body.clone()).into_response()
     }
-}
-
-/// Every refusal of the interface, as a fixed code (spec: one place).
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/json")],
-        format!("{{\"error\":\"{code}\"}}"),
-    )
-        .into_response()
 }

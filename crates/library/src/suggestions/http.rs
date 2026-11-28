@@ -7,15 +7,16 @@
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use super::{Accepted, SuggestionError};
 use crate::Library;
 use crate::accounts::http::signed_in;
+use crate::answers::{private as answer, refused};
 
 pub fn router(library: Library) -> Router {
     Router::new()
@@ -25,22 +26,6 @@ pub fn router(library: Library) -> Router {
         .with_state(library)
 }
 
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "private, no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    answer(status, json!({"error": code}))
-}
-
 fn suggestion_refused(error: SuggestionError) -> Response {
     match error {
         SuggestionError::BadIdentifier => {
@@ -48,6 +33,7 @@ fn suggestion_refused(error: SuggestionError) -> Response {
         }
         SuggestionError::BadSuggestion => refused(StatusCode::BAD_REQUEST, "bad_suggestion"),
         SuggestionError::UnknownItem => refused(StatusCode::NOT_FOUND, "unknown_item"),
+        SuggestionError::WithdrawnItem => refused(StatusCode::CONFLICT, "withdrawn_item"),
         SuggestionError::UnknownVersion => refused(StatusCode::NOT_FOUND, "unknown_version"),
         SuggestionError::UnknownQuestion => refused(StatusCode::BAD_REQUEST, "unknown_question"),
         SuggestionError::NotImported => refused(StatusCode::FORBIDDEN, "not_imported"),
@@ -99,6 +85,12 @@ async fn of_account(State(library): State<Library>, headers: HeaderMap) -> Respo
     };
     let mut items = Vec::new();
     for (item, _) in authored {
+        // A withdrawn item's suggestions can no longer be accepted.
+        match super::is_withdrawn(&library.pool, &item).await {
+            Ok(false) => {}
+            Ok(true) => continue,
+            Err(_) => return suggestion_refused(SuggestionError::Unavailable),
+        }
         match library.item_suggestions(&item).await {
             Ok(Some(suggestions)) if !suggestions.questions.is_empty() => items.push(suggestions),
             Ok(_) => {}

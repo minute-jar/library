@@ -9,7 +9,8 @@ type ActionEvent = Parameters<typeof actions.open>[0];
 const owl = {
 	pseudonym: 'Owl',
 	minute_jar_account: 'separate' as const,
-	opened_at: '2026-11-27T10:00:00Z'
+	opened_at: '2026-11-27T10:00:00Z',
+	show_earlier_pseudonyms: false
 };
 
 function event(
@@ -168,6 +169,29 @@ describe('the library account page', () => {
 		expect(answer).toEqual({ renamed: true });
 		expect(api.accounts.get('subject-1')?.pseudonym).toBe('Barn owl');
 		expect(refused).toMatchObject({ status: 400, data: { refused: 'bad_pseudonym' } });
+	});
+
+	it('shows the items of earlier pseudonyms on the public profile only when chosen', async () => {
+		const api = fakeAccounts();
+		const session = api.signedIn('subject-1', owl);
+
+		const shown = await actions.earlier(
+			event('/account', api, session, {
+				show_earlier_pseudonyms: 'on'
+			}) as unknown as ActionEvent
+		);
+		expect(shown).toEqual({ earlier: true });
+		expect(api.accounts.get('subject-1')?.show_earlier_pseudonyms).toBe(true);
+
+		const hidden = await actions.earlier(
+			event('/account', api, session, {}) as unknown as ActionEvent
+		);
+		expect(hidden).toEqual({ earlier: false });
+		expect(api.accounts.get('subject-1')?.show_earlier_pseudonyms).toBe(false);
+		const signedOut = await actions.earlier(
+			event('/account', api, undefined, {}) as unknown as ActionEvent
+		);
+		expect(signedOut).toMatchObject({ status: 401, data: { refused: 'signed_out' } });
 	});
 
 	it('closes the account once the parent confirms, and ends the session', async () => {

@@ -23,7 +23,7 @@ use serde_json::Value;
 use sqlx::PgPool;
 
 use crate::accounts::Session;
-use crate::review::{RefusalReason, ReviewOutcome, Reviewer, Submission};
+use crate::review::{RefusalReason, ReviewOutcome, ReviewProvider, Submission};
 use crate::{Author, Curriculum, ItemType, Library, Metadata, NewVersion, Origin, PublishError};
 use versions::NamedOrigin;
 
@@ -38,7 +38,7 @@ pub const SHARES_PER_DAY: u32 = 10;
 
 /// The sharing part of the service, once turned on.
 pub(crate) struct Desk {
-    pub reviewer: Box<dyn Reviewer>,
+    pub provider: Box<dyn ReviewProvider>,
 }
 
 /// Why a share is refused before the review.
@@ -396,7 +396,7 @@ pub(crate) async fn share(
     }
     let share = reserve(pool, &sharer, &version.title, now).await?;
     let outcome = desk
-        .reviewer
+        .provider
         .review(Submission {
             item: &item,
             version: lineage.version,
@@ -488,7 +488,7 @@ pub(crate) async fn share(
         }
     };
     // The sharing log: the identification data is kept for the legal
-    // period after the last share (ticket 26).
+    // period after the last share (issue #27).
     sqlx::query("UPDATE identifications SET last_shared_at = $2 WHERE account = $1")
         .bind(sharer.id)
         .bind(now.as_second())

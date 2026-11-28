@@ -6,13 +6,14 @@
 
 use axum::Router;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::accounts::http::signed_in;
+use crate::answers::{json, refused};
 use crate::browse::{ENTRY_COLUMNS, Row, entry};
 use crate::{Library, SuggestionError};
 
@@ -29,51 +30,81 @@ pub fn router(library: Library) -> Router {
 struct Author {
     account: i64,
     pseudonym: String,
+    /// Whether its profile shows the items published under its earlier
+    /// pseudonyms: its owner's choice, off by default.
+    earlier_shown: bool,
 }
 
 /// The account that holds `pseudonym` now, without regard to case, open or
 /// closed (a closed account keeps its pseudonym and its items).
 async fn holding(pool: &PgPool, pseudonym: &str) -> Result<Option<Author>, sqlx::Error> {
-    let found: Option<(i64, String)> = sqlx::query_as(
-        "SELECT id, pseudonym FROM library_accounts WHERE lower(pseudonym) = lower($1)",
+    let found: Option<(i64, String, bool)> = sqlx::query_as(
+        "SELECT id, pseudonym, show_earlier_pseudonyms FROM library_accounts
+         WHERE lower(pseudonym) = lower($1)",
     )
     .bind(pseudonym)
     .fetch_optional(pool)
     .await?;
-    Ok(found.map(|(account, pseudonym)| Author { account, pseudonym }))
+    Ok(found.map(|(account, pseudonym, earlier_shown)| Author {
+        account,
+        pseudonym,
+        earlier_shown,
+    }))
 }
 
-/// The pseudonym under which the profile of `item`'s author is found now:
-/// the one their library account holds, which may differ from the one a
-/// version was published under. `None` for an item no account shared.
-pub(crate) async fn of_item(pool: &PgPool, item: &str) -> Result<Option<String>, sqlx::Error> {
+/// The pseudonym under which the profile of `item`'s author is found now,
+/// for the version a page shows, published under `published_as`: the one
+/// their library account holds, which may differ. `None` for an item no
+/// account shared, and for one published under an earlier pseudonym unless
+/// its author chose to show those on their profile.
+pub(crate) async fn of_item(
+    pool: &PgPool,
+    item: &str,
+    published_as: &str,
+) -> Result<Option<String>, sqlx::Error> {
     let found: Option<(String,)> = sqlx::query_as(
         "SELECT a.pseudonym FROM authored_items AS i
          JOIN library_accounts AS a ON a.id = i.account
-         WHERE i.item = $1",
+         WHERE i.item = $1 AND (a.show_earlier_pseudonyms OR a.pseudonym = $2)",
     )
     .bind(item)
+    .bind(published_as)
     .fetch_optional(pool)
     .await?;
     Ok(found.map(|(pseudonym,)| pseudonym))
 }
 
 /// The latest version of every item of `$1`'s account that the catalogue
-/// shows: not withdrawn, not hidden from new imports.
-const SHOWN_OF_ACCOUNT: &str = "(SELECT DISTINCT ON (v.item) v.* FROM item_versions AS v
+/// shows: not withdrawn, not hidden from new imports; unless `$2`, only
+/// those published under `$3`, the account's pseudonym of now.
+const SHOWN_OF_ACCOUNT: &str = "(SELECT * FROM (SELECT DISTINCT ON (v.item) v.* FROM item_versions AS v
      JOIN authored_items AS a ON a.item = v.item
      WHERE a.account = $1
        AND NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
        AND NOT EXISTS (SELECT 1 FROM hidden_items AS h WHERE h.item = v.item)
-     ORDER BY v.item, v.version DESC) latest";
+     ORDER BY v.item, v.version DESC) AS shown
+     WHERE $2 OR shown.author_pseudonym = $3) latest";
+
+/// Which items a profile lists.
+#[derive(Clone, Copy)]
+enum Listed {
+    /// As anyone sees it: those of earlier pseudonyms only when the author
+    /// chose to show them.
+    Public,
+    /// As the author sees it: every item.
+    Own,
+}
 
 /// The profile of `author`, with no item when the catalogue shows none of
-/// theirs.
-async fn profile(pool: &PgPool, author: &Author) -> Result<Value, sqlx::Error> {
+/// theirs that `listed` keeps.
+async fn profile(pool: &PgPool, author: &Author, listed: Listed) -> Result<Value, sqlx::Error> {
+    let every = matches!(listed, Listed::Own) || author.earlier_shown;
     let rows: Vec<Row> = sqlx::query_as(&format!(
         "SELECT {ENTRY_COLUMNS} FROM {SHOWN_OF_ACCOUNT} ORDER BY latest.published_at DESC, latest.item"
     ))
     .bind(author.account)
+    .bind(every)
+    .bind(&author.pseudonym)
     .fetch_all(pool)
     .await?;
     // Families are counted by distinct library identifiers, which go no
@@ -83,6 +114,8 @@ async fn profile(pool: &PgPool, author: &Author) -> Result<Value, sqlx::Error> {
          WHERE item IN (SELECT item FROM {SHOWN_OF_ACCOUNT})"
     ))
     .bind(author.account)
+    .bind(every)
+    .bind(&author.pseudonym)
     .fetch_one(pool)
     .await?;
     let (editorial,): (bool,) =
@@ -104,12 +137,14 @@ async fn profile(pool: &PgPool, author: &Author) -> Result<Value, sqlx::Error> {
 async fn public(State(library): State<Library>, Path(pseudonym): Path<String>) -> Response {
     let found = async {
         match holding(&library.pool, &pseudonym).await? {
-            Some(author) => profile(&library.pool, &author).await.map(Some),
+            Some(author) => profile(&library.pool, &author, Listed::Public)
+                .await
+                .map(Some),
             None => Ok(None),
         }
     };
     match found.await {
-        Ok(Some(profile)) if !is_empty(&profile) => answer(StatusCode::OK, PROFILE_CACHE, profile),
+        Ok(Some(profile)) if !is_empty(&profile) => json(StatusCode::OK, PROFILE_CACHE, profile),
         Ok(_) => refused(StatusCode::NOT_FOUND, "unknown_author"),
         Err(_) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
@@ -139,7 +174,12 @@ async fn own(State(library): State<Library>, headers: HeaderMap) -> Response {
         let Some((account, pseudonym)) = author else {
             return Ok(None);
         };
-        let mut profile = profile(pool, &Author { account, pseudonym }).await?;
+        let author = Author {
+            account,
+            pseudonym,
+            earlier_shown: true,
+        };
+        let mut profile = profile(pool, &author, Listed::Own).await?;
         for entry in profile["items"].as_array_mut().expect("items") {
             let item = entry["item"].as_str().expect("an item").to_string();
             entry["suggestions"] = received(&library, &item).await?;
@@ -147,7 +187,7 @@ async fn own(State(library): State<Library>, headers: HeaderMap) -> Response {
         Ok(Some(profile))
     };
     match found.await {
-        Ok(Some(profile)) => answer(StatusCode::OK, "private, no-store", profile),
+        Ok(Some(profile)) => json(StatusCode::OK, crate::answers::NO_STORE, profile),
         Ok(None) => refused(StatusCode::NOT_FOUND, "no_account"),
         Err(Unavailable) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
@@ -181,25 +221,4 @@ async fn received(library: &Library, item: &str) -> Result<Value, Unavailable> {
         .map(|standing| standing.questions.iter().map(|q| q.answers.len()).sum())
         .unwrap_or(0);
     Ok(json!({"families": families, "answers": answers}))
-}
-
-fn answer(status: StatusCode, cache: &'static str, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, cache),
-        ],
-        body.to_string(),
-    )
-        .into_response()
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/json")],
-        json!({"error": code}).to_string(),
-    )
-        .into_response()
 }

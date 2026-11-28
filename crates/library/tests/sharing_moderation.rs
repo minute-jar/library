@@ -36,7 +36,7 @@ async fn held() -> Held {
             .unwrap();
     }
     let author = sharing.author(SUBJECT, "Owl").await;
-    sharing.reviewer.answer(Some(ReviewOutcome::Held {
+    sharing.review_provider.answer(Some(ReviewOutcome::Held {
         findings: "Question 2 may name a school.".into(),
     }));
     let shared = sharing.share(&author, prepared("Irregular verbs")).await;
@@ -148,7 +148,12 @@ async fn a_moderator_publishes_a_held_share_under_the_authors_pseudonym() {
         .await;
     assert_eq!(
         figures.json()["decisions"],
-        json!([{"reason": "personal_data", "outcome": "rejected", "count": 1}])
+        json!([]),
+        "no report was decided"
+    );
+    assert_eq!(
+        figures.json()["reviews"],
+        json!([{"case": "held_review", "reason": "personal_data", "outcome": "published", "count": 1}])
     );
 }
 
@@ -178,7 +183,12 @@ async fn a_moderator_refuses_a_held_share_with_reasons_for_its_author() {
         .await;
     assert_eq!(
         figures.json()["decisions"],
-        json!([{"reason": "personal_data", "outcome": "upheld", "count": 1}])
+        json!([]),
+        "a refused held share is no upheld report"
+    );
+    assert_eq!(
+        figures.json()["reviews"],
+        json!([{"case": "held_review", "reason": "personal_data", "outcome": "refused", "count": 1}])
     );
 }
 

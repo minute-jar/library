@@ -16,6 +16,7 @@ use super::moderation::{CommentDecisionError, CommentReport, CommentReportError}
 use super::{COMMENTS_PER_DAY, CommentOutcome, CommentRefusal, Desk};
 use crate::Library;
 use crate::accounts::http::signed_in;
+use crate::answers::{private as answer, refused};
 use crate::contract::time;
 use crate::moderation::http::moderator;
 use crate::reports::{DecideError, Decision, Outcome};
@@ -37,61 +38,45 @@ pub fn router(library: Library) -> Router {
         .with_state(library)
 }
 
-/// Why a comments route refuses: a code and its body, or another module's
-/// refusal (a session's, a moderator's) as it answers.
-enum Refusal {
-    Code(StatusCode, Value),
-    Answered(Box<Response>),
+/// Why a comments route refuses, as it answers: a code and its body, or
+/// another module's refusal (a session's, a moderator's).
+struct Refusal(Box<Response>);
+
+impl From<Response> for Refusal {
+    fn from(response: Response) -> Self {
+        Refusal(Box::new(response))
+    }
 }
 
 impl IntoResponse for Refusal {
     fn into_response(self) -> Response {
-        match self {
-            Refusal::Code(status, body) => answer(status, body),
-            Refusal::Answered(response) => *response,
-        }
+        *self.0
     }
 }
 
 /// Another module's refusal, as it answers.
 fn answered(refusal: impl IntoResponse) -> Refusal {
-    Refusal::Answered(Box::new(refusal.into_response()))
+    refusal.into_response().into()
 }
 
 type Answer = Result<Response, Refusal>;
 
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "private, no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Refusal {
-    Refusal::Code(status, json!({"error": code}))
-}
-
-fn unavailable() -> Refusal {
+fn unavailable() -> Response {
     refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable")
 }
 
-fn bad_request() -> Refusal {
+fn bad_request() -> Response {
     refused(StatusCode::BAD_REQUEST, "bad_request")
 }
 
 impl CommentRefusal {
     fn refusal(self) -> Refusal {
-        match self {
+        let response = match self {
             CommentRefusal::NoAccount => refused(StatusCode::NOT_FOUND, "no_account"),
             CommentRefusal::CardRequired => refused(StatusCode::FORBIDDEN, "card_required"),
             CommentRefusal::UnknownItem => refused(StatusCode::NOT_FOUND, "unknown_item"),
             CommentRefusal::BadComment => refused(StatusCode::BAD_REQUEST, "bad_comment"),
-            CommentRefusal::QuotaReached { next_comment_at } => Refusal::Code(
+            CommentRefusal::QuotaReached { next_comment_at } => answer(
                 StatusCode::TOO_MANY_REQUESTS,
                 json!({
                     "error": "comment_quota_reached",
@@ -100,13 +85,17 @@ impl CommentRefusal {
                 }),
             ),
             CommentRefusal::Unavailable => unavailable(),
-        }
+        };
+        response.into()
     }
 }
 
 /// The comments desk, once turned on.
 fn desk(library: &Library) -> Result<&Desk, Refusal> {
-    library.comments.as_deref().ok_or_else(unavailable)
+    library
+        .comments
+        .as_deref()
+        .ok_or_else(|| unavailable().into())
 }
 
 /// A comment: its text alone. Nothing names another account: no
@@ -124,14 +113,11 @@ async fn comment(
     request: Bytes,
 ) -> Answer {
     let Ok(Value::Object(body)) = serde_json::from_slice::<Value>(&request) else {
-        return Err(bad_request());
+        return Err(bad_request().into());
     };
     // A comment is never joined to a family server's library identifier.
     if body.contains_key("library_identifier") {
-        return Err(refused(
-            StatusCode::BAD_REQUEST,
-            "library_identifier_not_allowed",
-        ));
+        return Err(refused(StatusCode::BAD_REQUEST, "library_identifier_not_allowed").into());
     }
     let desk = desk(&library)?;
     let (session, now) = signed_in(&library, &headers).await.map_err(answered)?;
@@ -201,10 +187,10 @@ async fn report(
         )
             .into_response()),
         Err(CommentReportError::UnknownComment) => {
-            Err(refused(StatusCode::NOT_FOUND, "unknown_comment"))
+            Err(refused(StatusCode::NOT_FOUND, "unknown_comment").into())
         }
-        Err(CommentReportError::DetailsTooLong) => Err(bad_request()),
-        Err(CommentReportError::Database(_)) => Err(unavailable()),
+        Err(CommentReportError::DetailsTooLong) => Err(bad_request().into()),
+        Err(CommentReportError::Database(_)) => Err(unavailable().into()),
     }
 }
 

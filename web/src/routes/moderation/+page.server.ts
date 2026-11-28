@@ -4,7 +4,7 @@
 // reporter. Only a moderator signed in with a recent passkey gets in.
 
 import { error, fail } from '@sveltejs/kit';
-import { Refused, SESSION_COOKIE } from '#lib/server/accounts.ts';
+import { Refused, SESSION_COOKIE, signedOut } from '#lib/server/accounts.ts';
 import { Unavailable } from '#lib/server/catalogue.ts';
 import {
 	type AppealOutcome,
@@ -65,7 +65,7 @@ async function deciding(
 	const reasons = text(form, 'reasons');
 	const values = { case: id, outcome, reasons };
 	const session = cookies.get(SESSION_COOKIE);
-	if (!session) return fail(401, { refused: 'signed_out', ...values });
+	if (!session) return signedOut(values);
 	if (!outcomes.includes(outcome)) return fail(400, { refused: 'outcome_required', ...values });
 	if (
 		(field === 'share' || field === 'comment') &&

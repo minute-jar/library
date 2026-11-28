@@ -6,8 +6,8 @@ mod common;
 use axum::http::StatusCode;
 use common::*;
 use library::{
-    Message, Notifier, NotifyFuture, Reason, ReviewFuture, ReviewOutcome, Reviewer, Submission,
-    Withdrawal,
+    Message, Notifier, NotifyFuture, Reason, ReviewFuture, ReviewOutcome, ReviewProvider,
+    Submission, Withdrawal,
 };
 use serde_json::json;
 
@@ -68,7 +68,7 @@ async fn the_catalogue_lists_every_shared_item_at_its_latest_version_newest_firs
                     "description": "Comparer et ranger des fractions simples.",
                     "curriculum": null
                 },
-                "selection": false,
+                "selection": true,
                 "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                 "published_at": "2026-11-21T08:00:00Z"
             }
@@ -329,10 +329,10 @@ async fn an_entry_carries_the_signals_of_the_index() {
     );
 }
 
-/// A reviewer that finds nothing.
+/// A review provider that finds nothing.
 struct Clean;
 
-impl Reviewer for Clean {
+impl ReviewProvider for Clean {
     fn review<'a>(&'a self, _: Submission<'a>) -> ReviewFuture<'a> {
         Box::pin(async { Ok(ReviewOutcome::Published) })
     }

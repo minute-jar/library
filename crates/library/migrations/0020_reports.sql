@@ -43,7 +43,7 @@ CREATE TABLE hidden_items (
 );
 
 -- What the author of an item must be told, until their library account
--- (ticket 10) receives it: a report to answer, or a decision.
+-- (issue #10) receives it: a report to answer, or a decision.
 CREATE TABLE author_notifications (
     id BIGSERIAL PRIMARY KEY,
     item TEXT NOT NULL,

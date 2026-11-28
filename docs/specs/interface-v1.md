@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports, ratings, reports and shares. Suggestions are added by a later ticket of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports, ratings, suggestions, reports and shares.
 
 ## Signed documents
 
@@ -89,7 +89,7 @@ A family server accepts another signed document only if its `key` is listed in a
 - One entry per shared item, at its latest published version that is not withdrawn, ordered by `item`. A withdrawn item leaves the index.
 - `type` is `bank` or `path`. `licence` is always `CC-BY-SA-4.0` (ADR-0001).
 - `author.editorial` is true for a version the operator's editorial account shared (ADR-0002): the software's publisher, not a parent. It is set at publication and never changes in a signed version.
-- `selection` is true for an item the operator's team marked Selection (read and chosen; `moderation-api.md`, Selection). The library signs the index again whenever the mark is set or removed.
+- `selection` is true for an item the operator's team marked Selection (read and chosen; `moderation-api.md`, Selection), and for every item of the editorial account (`author.editorial` true), which carries the mark by right. The library signs the index again whenever the mark is set or removed.
 - `derived_from` is `null` or `{"item", "version", "pseudonym"}` of the original.
 - `metadata.language` is a BCP 47 tag; `curriculum` may be `null`.
 - An index lives three days; the library issues a new one at least daily.
@@ -270,7 +270,7 @@ Content-Type: application/json
 - `version` is the version the family uses; `question` the question's place in its `content.questions`, from 1, as in the review's reasons. The question must take answers (an `answers` array).
 - `answers` holds 1 to 10 answers, each trimmed, of 1 to 100 characters (Unicode scalar values) and without control characters. An answer the question already accepts is left out.
 - The answer is `204 No Content`, with no body and no cookie. Suggesting the same answer again changes nothing: each identifier counts once per answer.
-- Only an item the identifier reported importing can receive suggestions; otherwise `403 {"error": "not_imported"}`.
+- Only an item the identifier reported importing can receive suggestions; otherwise `403 {"error": "not_imported"}`. An item withdrawn whole, by its author or by moderation, or switched off, receives none: `409 {"error": "withdrawn_item"}`.
 - Refusals: `400 {"error": "bad_suggestion"}` for the answers; `404 {"error": "unknown_version"}`; `400 {"error": "unknown_question"}`; `bad_library_identifier`, `bad_request` and `unknown_item` as for imports. Like every `POST` under `/v1/`, it is refused with a session.
 - The library keeps with the identifier only the item, the version, the question and the answers, never a time, an address or an account. Suggestions are not public: only the item's author reads them, counted.
 
@@ -286,7 +286,7 @@ GET /api/account/suggestions
 ]}]}
 ```
 
-- Only the account's items with suggestions are listed. Questions are numbered in the item's latest `version`; a suggestion for an earlier version follows its question there by its `prompt`, and is left out when no question of the latest version has that prompt. An answer the latest version accepts is no longer suggested.
+- Only the account's items with suggestions are listed, and none withdrawn whole or switched off. Questions are numbered in the item's latest `version`; a suggestion for an earlier version follows its question there by its `prompt`, and is left out when no question of the latest version has that prompt. An answer the latest version accepts is no longer suggested.
 - `families` counts the distinct library identifiers that suggested the answer; the answers come most suggested first. No identifier is ever shown.
 
 The author accepts some of them into a new version:
@@ -323,6 +323,7 @@ Content-Type: application/json
  "notice": {"name": "Example Publishing", "work": "English Grammar, Year 5"}}
 ```
 
+- The website's report may carry the reporter's session, `Authorization: Bearer <session>` (`accounts-api.md`): a library account whose card is verified is then a **verified account**. Without a session, or with one that is no longer valid or whose account has no verified card, the report is anonymous; a session is never a reason to refuse it. The report keeps no link to the account.
 - `reason` is one of `personal_data`, `sexual_content`, `illegal_content`, `rights`, `unsuitable_content`, `wrong_answer`, `other`, the codes of the withdrawal list. `details` (at most 2000 characters), `contact` and `notice` may be left out. A family server's report carries no `contact` and no `notice`; the website's carries no library identifier.
 - The answer is `202 Accepted` with `{"report": "<32 hex>"}`, `Cache-Control: no-store` and no cookie: the report's identifier, 128 random bits, is its acknowledgement. Only its reporter knows it, and the library keeps no link between it and the library identifier.
 - `GET /v1/reports/{report}` answers where the report stands, with `Cache-Control: no-store`:
@@ -334,7 +335,7 @@ Content-Type: application/json
   ```
 
   `status` is `with_author` (a wrong answer or unsuitable content the author has 7 days to correct), `with_moderator`, `corrected` (the author published a new version within 7 days), `upheld` or `rejected`; `decision` is `null` until a moderator decides. A family server polls it to tell the parent the decision; a website reporter who left an address receives the acknowledgement and the decision by e-mail, and the address is erased once the decision is sent.
-- What a report does at once: for `personal_data`, `sexual_content` or `illegal_content`, the item is reviewed again on that reason; if the report is plausible, or if two families that imported the item reported it for one of these reasons, the item is switched off (`kind` `switch_off` in the withdrawal list), otherwise it leaves the index while still served to the families that have it (hidden from new imports). For `rights`, the item is hidden from new imports once three distinct library identifiers that imported it reported it, or at once on a formal notice. Other reasons change nothing until a moderator decides.
+- What a report does at once: for `personal_data`, `sexual_content` or `illegal_content`, the item is reviewed again on that reason; if the report is plausible, if two families that imported the item reported it for one of these reasons, or if a verified account reported it (without a review), the item is switched off (`kind` `switch_off` in the withdrawal list), otherwise it leaves the index while still served to the families that have it (hidden from new imports). For `rights`, the item is hidden from new imports once three distinct library identifiers that imported it reported it, or at once on a formal notice. Other reasons change nothing until a moderator decides.
 - A moderator's decision that upholds a report withdraws the item (`kind` `moderation`, with the report's reason); one that rejects it ends the switch-off or the hiding once no other report for the same reasons waits.
 - Refusals: a malformed identifier `400 {"error": "bad_library_identifier"}`; an unknown reason `400 {"error": "bad_reason"}`; a contact that is not an e-mail address `400 {"error": "bad_contact"}`; a notice without a name, a work or a contact, or for another reason than `rights`, `400 {"error": "bad_notice"}`; a body that is not the expected object, or details too long, `400 {"error": "bad_request"}`; an unknown item `404 {"error": "unknown_item"}`; an unknown report `404 {"error": "unknown_report"}`.
 
@@ -423,7 +424,7 @@ Content-Type: application/json
    "quota": {"shares_per_day": 10, "shared_today": 2, "next_share_at": null},
    "shares": [<share>, ...]}
   ```
-- Refusals, in this order: a body carrying `library_identifier` `400 {"error": "library_identifier_not_allowed"}` (nothing is read further, nothing kept); `503 unavailable` until the service is given a reviewer; `401 signed_out`; a body that is not the expected object `400 bad_request`; `403 strong_sign_in_required` (a recent strong sign-in, as for opening an account); `404 no_account`; `403 card_required` (the account's card is not verified, `accounts-api.md`, Card); `403 sharing_terms_required`; `400 bad_item` (title or metadata); `400 bad_content` (not in the bank format); `400 medium_too_large`, `media_too_large` or `unsupported_medium` (see Media); `404 unknown_item`, `403 not_the_author`, `409 withdrawn_item` (a new version); `400 bad_original`, `409 original_changed`, `404 unknown_original` (a derived work); `403 not_editorial`, `400 reading_required`, `400 bad_reading` (the editorial account); `429 share_quota_reached`; `503 unavailable` when the review cannot be reached.
+- Refusals, in this order: a body carrying `library_identifier` `400 {"error": "library_identifier_not_allowed"}` (nothing is read further, nothing kept); `503 unavailable` until the service is given a review provider; `401 signed_out`; a body that is not the expected object `400 bad_request`; `403 strong_sign_in_required` (a recent strong sign-in, as for opening an account); `404 no_account`; `403 card_required` (the account's card is not verified, `accounts-api.md`, Card); `403 sharing_terms_required`; `400 bad_item` (title or metadata); `400 bad_content` (not in the bank format); `400 medium_too_large`, `media_too_large` or `unsupported_medium` (see Media); `404 unknown_item`, `403 not_the_author`, `409 withdrawn_item` (a new version); `400 bad_original`, `409 original_changed`, `404 unknown_original` (a derived work); `403 not_editorial`, `400 reading_required`, `400 bad_reading` (the editorial account); `429 share_quota_reached`; `503 unavailable` when the review cannot be reached.
 - A held share waits in the moderation queue (`moderation-api.md`, `held_review`) until a moderator publishes it, under the account's pseudonym of that moment, or refuses it; `GET /api/account/shares` then answers its new outcome.
 - `GET /api/account/notifications`, with the session, answers what the author must be told about reports on their published items, oldest first: `{"notifications": [{"item", "title", "report", "reason", "details", "decision": null | {"outcome": "upheld" | "rejected", "reasons"}, "appeal": null | {"outcome": "maintained" | "reversed", "reasons"}, "at"}]}`. `decision` is `null` for a wrong answer or unsuitable content to correct within 7 days. The author may appeal a decision (see Appeals).
 - **The author's withdrawal** (story S17). `GET /api/account/items`, with the session, answers the account's published items, the latest published first, each with its versions, newest first, and what withdrew them: `{"items": [{"item", "title" (of its latest version), "withdrawal": null | {"kind", "reason", "withdrawn_at"}, "versions": [{"version", "published_at", "withdrawal": null | {...}}]}]}`, `kind` and `reason` as in the withdrawal list. `POST /api/account/items/{item}/withdrawal` with `{"version": null}` withdraws every version of the item, with `{"version": 2}` that version only; it answers `200` with the withdrawal list's entry (`"kind": "author", "reason": "author_choice"`). The item or version leaves the index and the catalogue at once and enters the withdrawal list. Refusals, in this order: `503 unavailable` without accounts; `401 signed_out`; `400 bad_request`; `403 strong_sign_in_required` (a recent strong sign-in, as for sharing); `404 no_account`; `404 unknown_item` for an item the account does not answer for, whoever's it is, or never published; `409 already_withdrawn` when the author withdrew it, or the whole item, already; `404 unknown_version`.
@@ -437,3 +438,4 @@ Content-Type: application/json
 - The bytes served are the same for every caller; nothing in a request changes them.
 - An unknown item answers `404` with `{"error": "unknown_item"}`, an unknown version of a known item `404` with `{"error": "unknown_version"}`.
 - A digest that no published version lists, or that is not 64 lowercase hexadecimal digits, answers `404` with `{"error": "unknown_media"}`.
+- Every refusal is `application/json` `{"error": "<code>"}` with `Cache-Control: private, no-store`: no cache keeps it.

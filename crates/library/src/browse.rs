@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
 use crate::Library;
+use crate::answers::refused;
 use crate::catalogue::LICENCE;
 
 const CATALOGUE_CACHE: &str = "public, max-age=60";
@@ -231,7 +232,8 @@ pub(crate) const ENTRY_COLUMNS: &str = "latest.item, latest.version, latest.type
      (SELECT count(*) FROM imports WHERE imports.item = latest.item),
      ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = latest.item AND ratings.stars = s)
            FROM generate_series(1, 5) AS s ORDER BY s),
-     EXISTS (SELECT 1 FROM selections WHERE selections.item = latest.item)";
+     (latest.author_editorial
+      OR EXISTS (SELECT 1 FROM selections WHERE selections.item = latest.item))";
 
 async fn browse(pool: &PgPool, filter: &Filter) -> Result<Value, sqlx::Error> {
     let (total,): (i64,) = kept("count(*)", filter)
@@ -282,13 +284,4 @@ pub(crate) fn entry(row: Row) -> Value {
         "signals": {"families": families, "ratings": ratings},
         "published_at": crate::contract::time(Timestamp::from_second(published_at).expect("a stored instant")),
     })
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/json")],
-        format!("{{\"error\":\"{code}\"}}"),
-    )
-        .into_response()
 }

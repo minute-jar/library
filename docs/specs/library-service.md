@@ -70,7 +70,7 @@ Words such as "random identifier" or "noised totals" appear only behind "Learn m
 23. As a parent, I want an item reported for a child's personal data or illegal content switched off in every family within the hour if the report holds up, so that harm stops.
 24. As an author, I want an item switched off wrongly to come back by itself when a moderator rejects the report, so that one malicious report costs nothing lasting.
 25. As a rights holder, I want a formal notice form, so that protected content is hidden at once.
-26. As a moderator, I want one queue with the AI review's findings, the reports and their history, so that I decide quickly and consistently.
+26. As a moderator, I want one queue with the AI review's findings, the reports and their timeline, so that I decide quickly and consistently.
 
 ### Ratings and comments
 
@@ -96,7 +96,7 @@ Words such as "random identifier" or "noised totals" appear only behind "Learn m
 
 - Two identities that the service never joins: the **library identifier** of a family server (anonymous calls: import, version checks, ratings, reports, suggestions, contributions), and the **library account**, a profile on a Minute Jar account (sharing, comments, badges; ADR-0006). A share never carries a library identifier.
 - Ratings count once per library identifier and only for an item the identifier has imported.
-- Identification data of library accounts (e-mail, card check reference, sharing log with addresses) are kept for one year after each share, as French law asks of hosting providers (**to be confirmed by legal counsel**); technical logs of anonymous calls are kept briefly and are not joined to identifiers.
+- Identification data of library accounts (e-mail, card check reference, sharing log with addresses) are kept for one year after each share or published comment, as French law asks of hosting providers (**to be confirmed by legal counsel**); technical logs of anonymous calls are kept briefly and are not joined to identifiers.
 - Hosted in the European Union; the data protection impact assessment of hosted mode (main repository, ADR-0018) covers the library.
 
 ### AI review
@@ -141,7 +141,7 @@ Words such as "random identifier" or "noised totals" appear only behind "Learn m
 
 ## Testing Decisions
 
-- A good test drives the service through its HTTP interface and checks what a caller sees, with time, the AI reviewer and billing passed in as fakes.
+- A good test drives the service through its HTTP interface and checks what a caller sees, with time, the AI review provider and billing passed in as fakes.
 - The interface contract's signed fixtures from the main repository run against this service.
 - Cases: account creation and its checks; a share published, held and refused; a new version re-reviewed; derived works keeping attribution; the three report paths and their thresholds; switch-off and automatic reactivation; the formal notice; withdrawals in the signed list; ratings once per identifier and only after import; comments held by review; no request joining a library identifier to an account; contributions below and above the publication threshold.
 

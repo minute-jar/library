@@ -1,4 +1,4 @@
--- Sharing from a library account (ticket 12, docs/specs/interface-v1.md,
+-- Sharing from a library account (issue #13, docs/specs/interface-v1.md,
 -- Shares): the sharing terms, the author of every shared item, and the
 -- sharing log.
 --
@@ -21,7 +21,7 @@ CREATE TABLE authored_items (
 CREATE INDEX authored_items_by_account ON authored_items (account);
 
 -- Every share and its outcome: the sharing log, identification data kept
--- with the account's (ticket 26). `outcome` is 'published', 'held' (for a
+-- with the account's (issue #27). `outcome` is 'published', 'held' (for a
 -- moderator) or 'refused'. `item` is drawn for a published or held share;
 -- `version` is set once published. `reasons` is the refusal's reasons per
 -- question, a JSON array; `findings` what the review found for a moderator.

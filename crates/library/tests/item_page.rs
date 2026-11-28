@@ -212,10 +212,10 @@ async fn no_file_for_a_withdrawn_or_unknown_version() {
     }
 }
 
-/// A reviewer that finds every report implausible, and a notifier that sends nothing.
+/// A review provider that finds every report implausible, and a notifier that sends nothing.
 struct Unconvinced;
 
-impl library::Reviewer for Unconvinced {
+impl library::ReviewProvider for Unconvinced {
     fn review<'a>(&'a self, _: library::Submission<'a>) -> library::ReviewFuture<'a> {
         Box::pin(async { Ok(library::ReviewOutcome::Published) })
     }

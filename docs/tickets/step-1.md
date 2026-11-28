@@ -97,14 +97,14 @@ Blocked by 9. Story S12.
 Blocked by 1, 9 and 10. Stories S10, S13, S16.
 
 - Sharing terms accepted at the first share; the parent app sends a prepared item with the account's session, never a library identifier.
-- The review interface (ADR-0005) returns published, held for a moderator, or refused with reasons per question; tests use a fake reviewer.
+- The review interface (ADR-0005) returns published, held for a moderator, or refused with reasons per question; tests use a fake review provider.
 - A published item enters the index; a quota per account and day, explained when reached.
 
 ### 13. Review adapter for Scaleway's Generative APIs (HITL)
 
 Blocked by 12.
 
-- The first real reviewer adapter, configured outside the repository; the maintainer opens the account and writes the private instructions.
+- The first real review provider adapter, configured outside the repository; the maintainer opens the account and writes the private instructions.
 
 ### 14. New versions and derived works (AFK)
 
@@ -154,7 +154,7 @@ Blocked by 2 and 16. Stories S20, S21, S23, S24, S25.
 
 Blocked by 7, 9 and 19. Stories S22, S26.
 
-- Administration pages for moderators (role given by the operator, passkey sign-in): one queue with review findings, reports and history; decisions with reasons to author and reporter; appeal; the decisions log for the yearly transparency report.
+- Administration pages for moderators (role given by the operator, passkey sign-in): one queue with review findings, reports and timeline; decisions with reasons to author and reporter; appeal; the decisions log for the yearly transparency report.
 
 ## Comments and profiles
 

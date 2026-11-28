@@ -1,6 +1,8 @@
 //! The yearly transparency report's figures (DSA), read from the reports and
-//! the decisions log: counts by reason and outcome, and nothing that names
-//! an item, a reporter, an author or a moderator.
+//! the decisions log: counts by kind of case, reason and outcome, and nothing
+//! that names an item, a reporter, an author or a moderator. Decisions on
+//! reports and decisions on what the review held are counted apart, each
+//! with its own outcomes.
 
 use jiff::Timestamp;
 use sqlx::PgPool;
@@ -8,7 +10,42 @@ use sqlx::PgPool;
 use super::appeals::{AppealStatus, Appellant};
 use super::reason;
 use crate::reports::Outcome;
+use crate::shares::held::HeldOutcome;
 use crate::withdrawals::Reason;
+
+/// What a moderator decided on, as the decisions log names it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaseKind {
+    /// A report of a shared item.
+    Report,
+    /// A report of a published comment.
+    CommentReport,
+    /// A share the review held.
+    HeldReview,
+    /// A comment the review held.
+    HeldComment,
+}
+
+impl CaseKind {
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            CaseKind::Report => "report",
+            CaseKind::CommentReport => "comment_report",
+            CaseKind::HeldReview => "held_review",
+            CaseKind::HeldComment => "held_comment",
+        }
+    }
+
+    fn from_code(code: &str) -> Self {
+        match code {
+            "report" => CaseKind::Report,
+            "comment_report" => CaseKind::CommentReport,
+            "held_review" => CaseKind::HeldReview,
+            "held_comment" => CaseKind::HeldComment,
+            _ => panic!("a stored case kind"),
+        }
+    }
+}
 
 /// What a year of moderation counts, each list ordered by its codes.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -16,8 +53,12 @@ pub struct Figures {
     pub year: i16,
     /// Reports received in the year, by reason.
     pub reports: Vec<(Reason, i64)>,
-    /// Moderators' decisions on reports made in the year, by reason and outcome.
-    pub decisions: Vec<(Reason, Outcome, i64)>,
+    /// Moderators' decisions on reports of items and comments made in the
+    /// year (not their appeals), by kind of case, reason and outcome.
+    pub decisions: Vec<(CaseKind, Reason, Outcome, i64)>,
+    /// Moderators' decisions on shares and comments the review held, made
+    /// in the year, by kind of case, reason and outcome.
+    pub reviews: Vec<(CaseKind, Reason, HeldOutcome, i64)>,
     /// Appeals received in the year, by appellant and where they stand.
     pub appeals: Vec<(Appellant, AppealStatus, i64)>,
 }
@@ -49,15 +90,41 @@ pub(crate) async fn of_year(pool: &PgPool, year: i16) -> Result<Option<Figures>,
     .bind(until)
     .fetch_all(pool)
     .await?;
-    let decisions: Vec<(String, String, i64)> = sqlx::query_as(
-        "SELECT reason, outcome, count(*) FROM moderation_decisions
+    let decided: Vec<(String, String, String, i64)> = sqlx::query_as(
+        "SELECT case_kind, reason, outcome, count(*) FROM moderation_decisions
          WHERE appeal IS NULL AND decided_at >= $1 AND decided_at < $2
-         GROUP BY reason, outcome ORDER BY reason, outcome",
+         GROUP BY case_kind, reason, outcome ORDER BY case_kind, reason, outcome",
     )
     .bind(from)
     .bind(until)
     .fetch_all(pool)
     .await?;
+    let mut decisions = Vec::new();
+    let mut reviews = Vec::new();
+    for (kind, code, outcome, count) in decided {
+        let kind = CaseKind::from_code(&kind);
+        // The log keeps `upheld` for what restricts content: an upheld
+        // report, or held content refused because its findings hold.
+        let upheld = outcome == "upheld";
+        match kind {
+            CaseKind::Report | CaseKind::CommentReport => {
+                let outcome = if upheld {
+                    Outcome::Upheld
+                } else {
+                    Outcome::Rejected
+                };
+                decisions.push((kind, reason(&code), outcome, count));
+            }
+            CaseKind::HeldReview | CaseKind::HeldComment => {
+                let outcome = if upheld {
+                    HeldOutcome::Refused
+                } else {
+                    HeldOutcome::Published
+                };
+                reviews.push((kind, reason(&code), outcome, count));
+            }
+        }
+    }
     let appeals: Vec<(String, String, i64)> = sqlx::query_as(
         "SELECT appellant, status, count(*) FROM appeals
          WHERE received_at >= $1 AND received_at < $2
@@ -73,17 +140,8 @@ pub(crate) async fn of_year(pool: &PgPool, year: i16) -> Result<Option<Figures>,
             .into_iter()
             .map(|(code, count)| (reason(&code), count))
             .collect(),
-        decisions: decisions
-            .into_iter()
-            .map(|(code, outcome, count)| {
-                let outcome = if outcome == "upheld" {
-                    Outcome::Upheld
-                } else {
-                    Outcome::Rejected
-                };
-                (reason(&code), outcome, count)
-            })
-            .collect(),
+        decisions,
+        reviews,
         appeals: appeals
             .into_iter()
             .map(|(appellant, status, count)| {

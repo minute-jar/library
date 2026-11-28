@@ -48,3 +48,28 @@ test('a parent closes their library account and is signed out', async ({ page })
 		page.getByRole('link', { name: 'Sign in with your Minute Jar account' })
 	).toBeVisible();
 });
+
+test('an author chooses to show the items of earlier pseudonyms on their profile', async ({
+	page
+}) => {
+	await page.goto('/account');
+	await page.getByRole('link', { name: 'Sign in with your Minute Jar account' }).click();
+	await page.getByRole('textbox', { name: 'Pseudonym' }).fill('Merlin');
+	await page.getByRole('radio', { name: /A separate account for the library/ }).check();
+	await page.getByRole('checkbox', { name: /I am an adult and a parent/ }).check();
+	await page.getByRole('button', { name: 'Open my library account' }).click();
+	await expect(page.getByRole('heading', { name: 'Merlin' })).toBeVisible();
+
+	const earlier = page.getByRole('checkbox', {
+		name: /items published under my earlier pseudonyms/
+	});
+	await expect(earlier).not.toBeChecked();
+	await earlier.check();
+	await page.getByRole('button', { name: 'Save this choice' }).click();
+
+	await expect(page.getByRole('status')).toHaveText('Your choice is saved.');
+	await page.reload();
+	await expect(
+		page.getByRole('checkbox', { name: /items published under my earlier pseudonyms/ })
+	).toBeChecked();
+});

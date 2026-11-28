@@ -1,4 +1,4 @@
--- The editorial account and the Selection mark (ticket 23, ADR-0002).
+-- The editorial account and the Selection mark (issue #24, ADR-0002).
 
 -- The library account the operator marked as its editorial account, under
 -- which it shares the content it makes itself, shown as the software's

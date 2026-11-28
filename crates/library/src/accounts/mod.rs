@@ -346,6 +346,9 @@ pub struct Account {
     pub pseudonym: String,
     pub minute_jar_account: MinuteJarAccount,
     pub opened_at: Timestamp,
+    /// Whether the public profile shows the items published under earlier
+    /// pseudonyms; off unless the owner chooses it.
+    pub show_earlier_pseudonyms: bool,
 }
 
 /// The library account opened on the Minute Jar account `subject`, if any.
@@ -353,16 +356,18 @@ pub(crate) async fn account_of(
     pool: &PgPool,
     subject: &str,
 ) -> Result<Option<Account>, sqlx::Error> {
-    let row: Option<(String, String, SqlTime)> = sqlx::query_as(
-        "SELECT pseudonym, minute_jar_account, opened_at FROM library_accounts WHERE subject = $1",
+    let row: Option<(String, String, SqlTime, bool)> = sqlx::query_as(
+        "SELECT pseudonym, minute_jar_account, opened_at, show_earlier_pseudonyms
+         FROM library_accounts WHERE subject = $1",
     )
     .bind(subject)
     .fetch_optional(pool)
     .await?;
-    Ok(row.map(|(pseudonym, choice, opened_at)| Account {
+    Ok(row.map(|(pseudonym, choice, opened_at, shown)| Account {
         pseudonym,
         minute_jar_account: MinuteJarAccount::from_name(&choice),
         opened_at: from_sqlx(opened_at),
+        show_earlier_pseudonyms: shown,
     }))
 }
 
@@ -487,7 +492,29 @@ pub(crate) async fn open(
         pseudonym,
         minute_jar_account: opening.minute_jar_account,
         opened_at: now,
+        show_earlier_pseudonyms: false,
     })
+}
+
+/// Sets whether the public profile of the session's library account shows
+/// the items it published under its earlier pseudonyms.
+pub(crate) async fn show_earlier_pseudonyms(
+    pool: &PgPool,
+    session: &Session,
+    shown: bool,
+) -> Result<Account, AccountError> {
+    let changed =
+        sqlx::query("UPDATE library_accounts SET show_earlier_pseudonyms = $2 WHERE subject = $1")
+            .bind(&session.subject)
+            .bind(shown)
+            .execute(pool)
+            .await?;
+    if changed.rows_affected() == 0 {
+        return Err(AccountError::NoAccount);
+    }
+    account_of(pool, &session.subject)
+        .await?
+        .ok_or(AccountError::NoAccount)
 }
 
 /// Changes the pseudonym of the session's library account.

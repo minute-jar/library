@@ -8,6 +8,7 @@
 pub mod contract;
 
 mod accounts;
+mod answers;
 mod authors_withdrawal;
 mod bank_format;
 mod browse;
@@ -57,8 +58,8 @@ pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
 pub use crate::moderation::{
     APPEAL_PERIOD, Appeal, AppealDecision, AppealError, AppealOutcome, AppealState, AppealStatus,
-    Appellant, Case, DECISION_TARGET, Event, Figures, History, HistoryEntry, ModeratorError,
-    QueuedAppeal, STATEMENT_LIMIT,
+    Appellant, Case, CaseKind, DECISION_TARGET, Event, Figures, ModeratorError, QueuedAppeal,
+    STATEMENT_LIMIT, Timeline, TimelineEntry,
 };
 pub use crate::ratings::{ItemRatings, REVIEW_LENGTH, RatingError, Review};
 pub use crate::reports::{
@@ -66,7 +67,7 @@ pub use crate::reports::{
     NewReport, Notifier, NotifyFuture, Outcome, QueuedReport, ReportError, ReportState,
     ReportStatus, Reporter,
 };
-pub use crate::review::{RefusalReason, ReviewFuture, ReviewOutcome, Reviewer, Submission};
+pub use crate::review::{RefusalReason, ReviewFuture, ReviewOutcome, ReviewProvider, Submission};
 pub use crate::shares::held::{HeldDecision, HeldDecisionError, HeldOutcome, HeldShare};
 pub use crate::shares::{SHARES_PER_DAY, SHARING_TERMS};
 pub use crate::suggestions::{
@@ -242,29 +243,29 @@ impl Library {
     }
 
     /// Turns on sharing from library accounts: every share is reviewed by
-    /// `reviewer` (ADR-0005). Needs [`Library::with_accounts`] and
+    /// `provider` (ADR-0005). Needs [`Library::with_accounts`] and
     /// [`Library::with_cards`] (a share needs a verified card); without it,
     /// the sharing routes are refused as unavailable.
-    pub fn with_sharing(mut self, reviewer: impl Reviewer) -> Self {
+    pub fn with_sharing(mut self, provider: impl ReviewProvider) -> Self {
         self.sharing = Some(Arc::new(shares::Desk {
-            reviewer: Box::new(reviewer),
+            provider: Box::new(provider),
         }));
         self
     }
 
     /// Turns on comments from library accounts: every comment is reviewed
-    /// by `reviewer` (ADR-0005) before it shows; the anonymous routes
+    /// by `provider` (ADR-0005) before it shows; the anonymous routes
     /// (reports of comments) read the instant from `clock`. Needs
     /// [`Library::with_accounts`] and [`Library::with_cards`] (a comment
     /// needs a verified card); without it, the comments' routes are refused
     /// as unavailable.
     pub fn with_comments(
         mut self,
-        reviewer: impl Reviewer,
+        provider: impl ReviewProvider,
         clock: impl Fn() -> Timestamp + Send + Sync + 'static,
     ) -> Self {
         self.comments = Some(Arc::new(comments::Desk {
-            reviewer: Box::new(reviewer),
+            provider: Box::new(provider),
             clock: Box::new(clock),
         }));
         self
@@ -417,18 +418,18 @@ impl Library {
         withdrawals::reactivate(&self.pool, &self.signing, item, version, now).await
     }
 
-    /// The service receiving reports: urgent ones are reviewed by `reviewer`,
+    /// The service receiving reports: urgent ones are reviewed by `provider`,
     /// reporters who left an address hear from `notifier`, and the HTTP
     /// routes read the instant from `clock`. Without it, reports are refused
     /// as unavailable.
     pub fn with_reports(
         mut self,
-        reviewer: impl Reviewer,
+        provider: impl ReviewProvider,
         notifier: impl Notifier,
         clock: impl Fn() -> Timestamp + Send + Sync + 'static,
     ) -> Self {
         self.reports = Some(Arc::new(reports::Desk {
-            reviewer: Box::new(reviewer),
+            provider: Box::new(provider),
             notifier: Box::new(notifier),
             clock: Box::new(clock),
         }));
@@ -596,9 +597,9 @@ impl Library {
         moderation::figures(&self.pool, year).await
     }
 
-    /// The history of `item` in moderation, oldest first, if it exists.
-    pub async fn moderation_history(&self, item: &str) -> Result<Option<History>, sqlx::Error> {
-        moderation::history(&self.pool, item).await
+    /// The timeline of `item` in moderation, oldest first, if it exists.
+    pub async fn moderation_timeline(&self, item: &str) -> Result<Option<Timeline>, sqlx::Error> {
+        moderation::timeline(&self.pool, item).await
     }
 
     /// Records at `now` the decision of the moderator `moderator` on a share
