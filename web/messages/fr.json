@@ -100,7 +100,7 @@
 	"refused_other": "Cela n'a pas pu être fait. Réessayez.",
 	"close_title": "Fermer votre compte bibliothèque",
 	"close_what": "Vos éléments partagés restent publiés sous leur licence, avec votre pseudonyme, et votre pseudonyme reste réservé : personne d'autre ne peut le prendre. Vous êtes déconnecté de tous vos appareils.",
-	"close_kept": "Comme la loi le demande aux hébergeurs, l'adresse e-mail de votre compte Minute Jar est conservée un an après votre dernier partage, puis effacée. Elle n'est jamais montrée à personne.",
+	"close_kept": "Comme la loi le demande aux hébergeurs, l'adresse e-mail de votre compte Minute Jar est conservée un an après votre dernier partage ou commentaire publié, puis effacée. Elle n'est jamais montrée à personne.",
 	"close_strong": "Pour fermer votre compte bibliothèque, reconnectez-vous d'abord.",
 	"close_understood": "Je comprends que mes éléments partagés restent publiés avec mon pseudonyme.",
 	"close_submit": "Fermer mon compte bibliothèque",

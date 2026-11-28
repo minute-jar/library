@@ -1,7 +1,7 @@
 //! Closing a library account (story S12): its owner leaves, its items stay
 //! published under their licence with its pseudonym, which no other account
-//! may take; its identification data is kept for the legal period, then
-//! erased.
+//! may take; its identification data is kept for the legal period after
+//! what it last published, a share or a comment, then erased.
 
 use axum::Router;
 use axum::extract::State;
@@ -16,7 +16,8 @@ use super::{AccountError, Session, sqlx_time};
 use crate::Library;
 
 /// How long the identification data of a closed account is kept after its
-/// last share, by default: one year (issue #27, to be confirmed by counsel).
+/// last share or published comment, by default: one year (issue #27, to be
+/// confirmed by counsel).
 pub const IDENTIFICATION_RETENTION: SignedDuration = SignedDuration::from_hours(365 * 24);
 
 pub fn router(library: Library) -> Router {
@@ -76,8 +77,9 @@ pub(crate) async fn close(
 }
 
 /// Erases at `now` the identification data of closed accounts whose last
-/// share is older than `kept_for`, and of those that never shared: their
-/// identification and their verified card.
+/// share and last published comment are older than `kept_for`, and of
+/// those that published nothing: their identification and their verified
+/// card. A published comment is answered for like a share.
 pub(crate) async fn erase_identifications(
     pool: &PgPool,
     now: Timestamp,
@@ -92,6 +94,9 @@ pub(crate) async fn erase_identifications(
            AND account.closed_at IS NOT NULL
            AND (identification.last_shared_at IS NULL
                 OR identification.last_shared_at <= $1)
+           AND NOT EXISTS (SELECT 1 FROM comments AS comment
+                           WHERE comment.account = identification.account
+                             AND comment.published_at > $1)
          RETURNING identification.account",
     )
     .bind(sqlx_time(limit))

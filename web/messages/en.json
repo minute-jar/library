@@ -100,7 +100,7 @@
 	"refused_other": "This could not be done. Please try again.",
 	"close_title": "Close your library account",
 	"close_what": "Your shared items stay published under their licence, with your pseudonym, and your pseudonym stays reserved: no one else can take it. You are signed out on every device.",
-	"close_kept": "As the law asks of hosting providers, the e-mail address of your Minute Jar account is kept one year after your last share, then erased. It is never shown to anyone.",
+	"close_kept": "As the law asks of hosting providers, the e-mail address of your Minute Jar account is kept one year after your last share or published comment, then erased. It is never shown to anyone.",
 	"close_strong": "To close your library account, sign in again first.",
 	"close_understood": "I understand that my shared items stay published with my pseudonym.",
 	"close_submit": "Close my library account",

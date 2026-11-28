@@ -96,7 +96,7 @@ Words such as "random identifier" or "noised totals" appear only behind "Learn m
 
 - Two identities that the service never joins: the **library identifier** of a family server (anonymous calls: import, version checks, ratings, reports, suggestions, contributions), and the **library account**, a profile on a Minute Jar account (sharing, comments, badges; ADR-0006). A share never carries a library identifier.
 - Ratings count once per library identifier and only for an item the identifier has imported.
-- Identification data of library accounts (e-mail, card check reference, sharing log with addresses) are kept for one year after each share, as French law asks of hosting providers (**to be confirmed by legal counsel**); technical logs of anonymous calls are kept briefly and are not joined to identifiers.
+- Identification data of library accounts (e-mail, card check reference, sharing log with addresses) are kept for one year after each share or published comment, as French law asks of hosting providers (**to be confirmed by legal counsel**); technical logs of anonymous calls are kept briefly and are not joined to identifiers.
 - Hosted in the European Union; the data protection impact assessment of hosted mode (main repository, ADR-0018) covers the library.
 
 ### AI review

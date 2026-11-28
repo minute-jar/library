@@ -8,5 +8,6 @@ ALTER TABLE library_accounts ADD COLUMN closed_at BIGINT;
 
 -- When the account last shared an item (issue #13 records it). The
 -- identification data of a closed account is kept for the legal period
--- after it (issue #27), and erased at once if it never shared.
+-- after it or after its last published comment, whichever is later
+-- (issue #27), and erased at once if it published nothing.
 ALTER TABLE identifications ADD COLUMN last_shared_at BIGINT;

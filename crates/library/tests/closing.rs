@@ -327,3 +327,74 @@ async fn the_card_routes_refuse_a_closed_account() {
         assert_eq!(by_new.json(), json!({"error": "no_account"}));
     }
 }
+
+/// A closed account that commented on the verbs bank once, with `outcome`
+/// from the review, and never shared; answers the library, its database
+/// and when it commented.
+async fn commented_then_closed(
+    outcome: library::ReviewOutcome,
+) -> (library::Library, String, jiff::Timestamp) {
+    let commenting = common::comments::with_commenting().await;
+    let session = commenting.commenter(SUBJECT, "Lark").await;
+    commenting.review(Some(outcome));
+    let commented = commenting.comment(&session, "Learnt in a week.").await;
+    assert!(commented.status.is_success(), "{}", commented.status);
+    let when = commenting.sharing.clock.now();
+    let library = commenting.library().clone();
+    assert_eq!(
+        close(&library, &session).await.status,
+        StatusCode::NO_CONTENT
+    );
+    (library, commenting.sharing.database.clone(), when)
+}
+
+#[tokio::test]
+async fn identification_data_is_kept_a_year_after_the_last_published_comment() {
+    let (library, database, commented) =
+        commented_then_closed(library::ReviewOutcome::Published).await;
+    let a_year_later = commented
+        .checked_add(library::IDENTIFICATION_RETENTION)
+        .unwrap();
+
+    library
+        .erase_identifications(
+            a_year_later
+                .checked_sub(jiff::SignedDuration::from_secs(1))
+                .unwrap(),
+            library::IDENTIFICATION_RETENTION,
+        )
+        .await
+        .unwrap();
+    assert_eq!(tables_holding(&database, EMAIL).await, ["identifications"]);
+
+    library
+        .erase_identifications(a_year_later, library::IDENTIFICATION_RETENTION)
+        .await
+        .unwrap();
+    assert!(tables_holding(&database, EMAIL).await.is_empty());
+}
+
+#[tokio::test]
+async fn a_closed_account_whose_comments_were_never_published_has_its_identification_erased_at_once()
+ {
+    let (library, database, commented) = commented_then_closed(library::ReviewOutcome::Refused {
+        reasons: vec![library::RefusalReason {
+            question: None,
+            reason: library::Reason::UnsuitableContent,
+            explanation: "Rude.".into(),
+        }],
+    })
+    .await;
+
+    library
+        .erase_identifications(
+            commented
+                .checked_add(jiff::SignedDuration::from_mins(1))
+                .unwrap(),
+            library::IDENTIFICATION_RETENTION,
+        )
+        .await
+        .unwrap();
+
+    assert!(tables_holding(&database, EMAIL).await.is_empty());
+}
