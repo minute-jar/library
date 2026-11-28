@@ -6,7 +6,7 @@
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use serde::Deserialize;
@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 use super::{Desk, Prepared, SHARES_PER_DAY, SHARING_TERMS, Share, ShareOutcome, ShareRefusal};
 use crate::accounts::Session;
 use crate::accounts::http::{Refusal, signed_in};
+use crate::answers::private as answer;
 use crate::contract::time;
 use crate::moderation::{Appeal, AppealError, Appellant};
 use crate::{Library, Outcome};
@@ -292,16 +293,4 @@ async fn appeal(
             Err(Refused::Share(ShareRefusal::Unavailable))
         }
     }
-}
-
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "private, no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
 }

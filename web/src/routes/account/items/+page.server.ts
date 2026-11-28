@@ -5,7 +5,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { localizeHref } from '#lib/paraglide/runtime.js';
 import { Unavailable } from '#lib/server/catalogue.ts';
-import { Refused, SESSION_COOKIE, accounts } from '#lib/server/accounts.ts';
+import { Refused, SESSION_COOKIE, signedOut, accounts } from '#lib/server/accounts.ts';
 import { type AuthoredItem, authored } from '#lib/server/authored.ts';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -30,7 +30,7 @@ export const load = (async ({ fetch, cookies }) => {
 export const actions = {
 	withdraw: async ({ fetch, cookies, request }) => {
 		const session = cookies.get(SESSION_COOKIE);
-		if (!session) return fail(401, { refused: 'signed_out', item: '' });
+		if (!session) return signedOut({ item: '' });
 		const form = await request.formData();
 		const item = form.get('item');
 		const version = form.get('version');

@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use sqlx::{PgPool, Postgres, QueryBuilder};
 
 use crate::Library;
+use crate::answers::refused;
 use crate::catalogue::LICENCE;
 
 const CATALOGUE_CACHE: &str = "public, max-age=60";
@@ -282,13 +283,4 @@ pub(crate) fn entry(row: Row) -> Value {
         "signals": {"families": families, "ratings": ratings},
         "published_at": crate::contract::time(Timestamp::from_second(published_at).expect("a stored instant")),
     })
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/json")],
-        format!("{{\"error\":\"{code}\"}}"),
-    )
-        .into_response()
 }

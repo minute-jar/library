@@ -163,5 +163,5 @@ Content-Type: application/json
 
 ## HTTP
 
-- Answers are `application/json` with `Cache-Control: public, max-age=60`, except item files (`interface-v1.md`, Item files).
+- Answers are `application/json` with `Cache-Control: public, max-age=60`, except item files (`interface-v1.md`, Item files) and refusals, which carry `Cache-Control: private, no-store`.
 - A database failure answers `503` with `{"error": "unavailable"}`.

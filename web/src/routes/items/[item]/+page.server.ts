@@ -5,7 +5,7 @@
 
 import { error, fail } from '@sveltejs/kit';
 import { NotFound, items } from '#lib/server/items.ts';
-import { Refused, SESSION_COOKIE } from '#lib/server/accounts.ts';
+import { Refused, SESSION_COOKIE, signedOut } from '#lib/server/accounts.ts';
 import { Unavailable } from '#lib/server/catalogue.ts';
 import { REPORT_REASONS, comments } from '#lib/server/comments.ts';
 import type { Actions, PageServerLoad } from './$types';
@@ -41,7 +41,7 @@ export const actions = {
 	comment: async ({ params, fetch, cookies, request }) => {
 		const written = text(await request.formData(), 'text');
 		const session = cookies.get(SESSION_COOKIE);
-		if (!session) return fail(401, { refused: 'signed_out', text: written });
+		if (!session) return signedOut({ text: written });
 		try {
 			const commented = await comments(fetch).comment(session, params.item, written);
 			if (commented.outcome === 'refused') {

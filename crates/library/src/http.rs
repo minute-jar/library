@@ -12,6 +12,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 
+use crate::answers::refused;
 use crate::catalogue::{self, Stored, item_path};
 use crate::media;
 use crate::{
@@ -359,14 +360,4 @@ fn served(stored: &Stored, cache: &'static str, request: &HeaderMap) -> Response
     } else {
         (headers, stored.body.clone()).into_response()
     }
-}
-
-/// Every refusal of the interface, as a fixed code (spec: one place).
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/json")],
-        format!("{{\"error\":\"{code}\"}}"),
-    )
-        .into_response()
 }

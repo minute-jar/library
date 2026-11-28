@@ -3,13 +3,21 @@
 // browser and travels to the API as a bearer token; the browser never calls
 // the API itself.
 
+import { fail } from '@sveltejs/kit';
 import { LIBRARY_API } from '$app/env/private';
-import { Unavailable } from './catalogue.ts';
+import { Refused, caller } from './api.ts';
 
 /** The cookie holding the session. */
 export const SESSION_COOKIE = 'library_session';
 /** The cookie holding a started sign-in's state and the visitor's language. */
 export const SIGN_IN_COOKIE = 'library_sign_in';
+
+/** An action's refusal without a session, keeping what the form held. */
+export function signedOut<Values extends Record<string, unknown> = Record<never, never>>(
+	values: Values = {} as Values
+) {
+	return fail(401, { refused: 'signed_out', ...values });
+}
 
 export type MinuteJarAccount = 'same_as_subscription' | 'separate';
 
@@ -33,42 +41,10 @@ export type Opening = {
 	minute_jar_account: MinuteJarAccount;
 };
 
-/** The API refused the request with a fixed code (`bad_pseudonym`, `signed_out`...). */
-export class Refused extends Error {
-	constructor(
-		readonly status: number,
-		readonly code: string
-	) {
-		super(`the accounts API refused: ${code}`);
-	}
-}
+export { Refused };
 
 export function accounts(fetch: typeof globalThis.fetch, root: string = LIBRARY_API) {
-	async function call<T>(
-		method: string,
-		path: string,
-		{ session, body }: { session?: string; body?: unknown } = {}
-	): Promise<T> {
-		const headers: Record<string, string> = {};
-		if (session) headers.authorization = `Bearer ${session}`;
-		if (body !== undefined) headers['content-type'] = 'application/json';
-		let response: Response;
-		try {
-			response = await fetch(new URL(path, root), {
-				method,
-				headers,
-				body: body === undefined ? undefined : JSON.stringify(body)
-			});
-		} catch (cause) {
-			throw new Unavailable('the accounts API is unreachable', { cause });
-		}
-		if (response.status === 204) return undefined as T;
-		if (response.status >= 500)
-			throw new Unavailable(`the accounts API answered ${response.status}`);
-		const answer = (await response.json()) as T & { error?: string };
-		if (!response.ok) throw new Refused(response.status, answer.error ?? 'bad_request');
-		return answer;
-	}
+	const call = caller(fetch, root, 'accounts');
 
 	return {
 		startSignIn(strong: boolean) {

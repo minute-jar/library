@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::Library;
+use crate::answers::refused;
 use crate::browse::{ENTRY_COLUMNS, Row, entry};
 use crate::catalogue::{self, item_path};
 
@@ -183,13 +184,4 @@ fn signed_payload(body: &str) -> Value {
 
 fn time(second: i64) -> String {
     crate::contract::time(jiff::Timestamp::from_second(second).expect("a stored instant"))
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/json")],
-        format!("{{\"error\":\"{code}\"}}"),
-    )
-        .into_response()
 }

@@ -3,7 +3,7 @@
 // and its Selection mark, which a moderator sets or removes here.
 
 import { error, fail } from '@sveltejs/kit';
-import { Refused, SESSION_COOKIE } from '#lib/server/accounts.ts';
+import { Refused, SESSION_COOKIE, signedOut } from '#lib/server/accounts.ts';
 import { Unavailable } from '#lib/server/catalogue.ts';
 import { type Timeline, access, moderation } from '#lib/server/moderation.ts';
 import type { Actions, PageServerLoad } from './$types';
@@ -28,7 +28,7 @@ async function marking(
 	selected: boolean
 ) {
 	const session = cookies.get(SESSION_COOKIE);
-	if (!session) return fail(401, { refused: 'signed_out' });
+	if (!session) return signedOut();
 	try {
 		await moderation(fetch).mark(session, params.item ?? '', selected);
 		return { selection: selected ? 'selected' : 'unselected' };

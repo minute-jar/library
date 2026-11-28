@@ -4,15 +4,16 @@
 
 use axum::Router;
 use axum::extract::State;
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
-use serde_json::{Value, json};
+use serde_json::json;
 
 use super::{CardRefusal, Desk, Verification};
 use crate::Library;
 use crate::accounts::Session;
 use crate::accounts::http::{Refusal, signed_in};
+use crate::answers::{private as answer, refused};
 
 pub fn router(library: Library) -> Router {
     Router::new()
@@ -45,10 +46,6 @@ impl IntoResponse for Refused {
             Refused::NoCard => refused(StatusCode::NOT_FOUND, "no_card"),
         }
     }
-}
-
-fn refused(status: StatusCode, error: &str) -> Response {
-    answer(status, json!({"error": error}))
 }
 
 impl IntoResponse for CardRefusal {
@@ -101,16 +98,4 @@ async fn finish(State(library): State<Library>, headers: HeaderMap) -> Answer {
     let (session, now, desk) = signed_in_with_cards(&library, &headers).await?;
     let card = super::finish(&library.pool, desk, &session, now).await?;
     Ok(answer(StatusCode::OK, json!({"card": card})))
-}
-
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "private, no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
 }

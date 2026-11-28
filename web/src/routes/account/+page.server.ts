@@ -1,6 +1,12 @@
 import { error, fail } from '@sveltejs/kit';
 import { Unavailable } from '#lib/server/catalogue.ts';
-import { type MinuteJarAccount, Refused, SESSION_COOKIE, accounts } from '#lib/server/accounts.ts';
+import {
+	type MinuteJarAccount,
+	Refused,
+	SESSION_COOKIE,
+	signedOut,
+	accounts
+} from '#lib/server/accounts.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 const CHOICES: MinuteJarAccount[] = ['same_as_subscription', 'separate'];
@@ -14,13 +20,13 @@ function text(form: FormData, name: string): string {
 export const load = (async ({ url, fetch, cookies }) => {
 	const signInFailed = url.searchParams.get('sign_in') === 'failed';
 	const session = cookies.get(SESSION_COOKIE);
-	const signedOut = { signedIn: false, signInFailed, account: null, strong: false };
-	if (!session) return signedOut;
+	const visitor = { signedIn: false, signInFailed, account: null, strong: false };
+	if (!session) return visitor;
 	try {
 		const state = await accounts(fetch).session(session);
 		if (!state) {
 			cookies.delete(SESSION_COOKIE, { path: '/' });
-			return signedOut;
+			return visitor;
 		}
 		return {
 			signedIn: true,
@@ -47,7 +53,7 @@ export const actions = {
 		const choice = text(form, 'minute_jar_account') as MinuteJarAccount;
 		const values = { pseudonym, choice };
 		const session = cookies.get(SESSION_COOKIE);
-		if (!session) return fail(401, { refused: 'signed_out', ...values });
+		if (!session) return signedOut(values);
 		if (!CHOICES.includes(choice)) return fail(400, { refused: 'choice_required', ...values });
 		try {
 			await accounts(fetch).open(session, {
@@ -65,7 +71,7 @@ export const actions = {
 		const form = await request.formData();
 		const pseudonym = text(form, 'pseudonym');
 		const session = cookies.get(SESSION_COOKIE);
-		if (!session) return fail(401, { refused: 'signed_out', pseudonym });
+		if (!session) return signedOut({ pseudonym });
 		try {
 			await accounts(fetch).rename(session, pseudonym);
 			return { renamed: true };
@@ -77,7 +83,7 @@ export const actions = {
 	close: async ({ request, fetch, cookies }) => {
 		const form = await request.formData();
 		const session = cookies.get(SESSION_COOKIE);
-		if (!session) return fail(401, { refused: 'signed_out' });
+		if (!session) return signedOut();
 		if (form.get('understood') !== 'on') return fail(400, { refused: 'confirmation_required' });
 		try {
 			await accounts(fetch).close(session);

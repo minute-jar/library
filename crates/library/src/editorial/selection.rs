@@ -14,6 +14,7 @@ use sqlx::PgPool;
 
 use crate::Library;
 use crate::accounts::http::signed_in;
+use crate::answers::{NO_STORE, refused};
 use crate::contract::SigningKey;
 
 /// Why the Selection mark could not be set or removed.
@@ -147,20 +148,6 @@ async fn remove(
     headers: HeaderMap,
 ) -> Response {
     answer(&library, &headers, &item, false).await
-}
-
-const NO_STORE: &str = "private, no-store";
-
-fn refused(status: StatusCode, code: &str) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, NO_STORE),
-        ],
-        json!({"error": code}).to_string(),
-    )
-        .into_response()
 }
 
 /// Sets or removes the mark for the moderator a request comes from, signed

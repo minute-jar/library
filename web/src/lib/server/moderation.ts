@@ -3,8 +3,7 @@
 // session of a moderator signed in with a recent passkey.
 
 import { LIBRARY_API } from '$app/env/private';
-import { Refused } from './accounts.ts';
-import { Unavailable } from './catalogue.ts';
+import { Refused, caller } from './api.ts';
 
 export type Reason =
 	| 'personal_data'
@@ -177,49 +176,28 @@ export function access(failure: unknown): Access | null {
 }
 
 export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRARY_API) {
-	async function call<T>(method: string, path: string, session: string, body?: unknown) {
-		const headers: Record<string, string> = { authorization: `Bearer ${session}` };
-		if (body !== undefined) headers['content-type'] = 'application/json';
-		let response: Response;
-		try {
-			response = await fetch(new URL(path, root), {
-				method,
-				headers,
-				body: body === undefined ? undefined : JSON.stringify(body)
-			});
-		} catch (cause) {
-			throw new Unavailable('the moderation API is unreachable', { cause });
-		}
-		if (response.status === 204) return undefined as T;
-		if (response.status >= 500)
-			throw new Unavailable(`the moderation API answered ${response.status}`);
-		const answer = (await response.json()) as T & { error?: string };
-		if (!response.ok) throw new Refused(response.status, answer.error ?? 'bad_request');
-		return answer;
-	}
+	const call = caller(fetch, root, 'moderation');
 
 	return {
 		async queue(session: string) {
-			return (await call<{ cases: Case[] }>('GET', '/api/moderation/queue', session)).cases;
+			return (await call<{ cases: Case[] }>('GET', '/api/moderation/queue', { session })).cases;
 		},
 		timeline(session: string, item: string) {
-			return call<Timeline>('GET', `/api/moderation/items/${encodeURIComponent(item)}`, session);
+			return call<Timeline>('GET', `/api/moderation/items/${encodeURIComponent(item)}`, {
+				session
+			});
 		},
 		decideReport(session: string, report: string, outcome: Outcome, reasons: string) {
-			return call<void>(
-				'POST',
-				`/api/moderation/reports/${encodeURIComponent(report)}/decision`,
+			return call<void>('POST', `/api/moderation/reports/${encodeURIComponent(report)}/decision`, {
 				session,
-				{ outcome, reasons }
-			);
+				body: { outcome, reasons }
+			});
 		},
 		decideAppeal(session: string, appeal: string, outcome: AppealOutcome, reasons: string) {
-			return call<void>(
-				'POST',
-				`/api/moderation/appeals/${encodeURIComponent(appeal)}/decision`,
+			return call<void>('POST', `/api/moderation/appeals/${encodeURIComponent(appeal)}/decision`, {
 				session,
-				{ outcome, reasons }
-			);
+				body: { outcome, reasons }
+			});
 		},
 		/** Publishes or refuses a held share, naming the rule its findings were about. */
 		decideShare(
@@ -229,12 +207,10 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 			reason: Reason,
 			reasons: string
 		) {
-			return call<void>(
-				'POST',
-				`/api/moderation/shares/${encodeURIComponent(share)}/decision`,
+			return call<void>('POST', `/api/moderation/shares/${encodeURIComponent(share)}/decision`, {
 				session,
-				{ outcome, reason, reasons }
-			);
+				body: { outcome, reason, reasons }
+			});
 		},
 		/** Publishes or refuses a held comment, naming the rule its findings were about. */
 		decideComment(
@@ -247,8 +223,7 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 			return call<void>(
 				'POST',
 				`/api/moderation/comments/${encodeURIComponent(comment)}/decision`,
-				session,
-				{ outcome, reason, reasons }
+				{ session, body: { outcome, reason, reasons } }
 			);
 		},
 		/** Upholds the report of a comment, which removes it, or rejects it. */
@@ -256,8 +231,7 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 			return call<void>(
 				'POST',
 				`/api/moderation/comment-reports/${encodeURIComponent(report)}/decision`,
-				session,
-				{ outcome, reasons }
+				{ session, body: { outcome, reasons } }
 			);
 		},
 		/** Marks the item Selection, or removes the mark; the index is signed again. */
@@ -265,11 +239,11 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 			return call<void>(
 				selected ? 'PUT' : 'DELETE',
 				`/api/moderation/items/${encodeURIComponent(item)}/selection`,
-				session
+				{ session }
 			);
 		},
 		figures(session: string, year: number) {
-			return call<Figures>('GET', `/api/moderation/figures/${year}`, session);
+			return call<Figures>('GET', `/api/moderation/figures/${year}`, { session });
 		}
 	};
 }

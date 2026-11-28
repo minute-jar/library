@@ -151,6 +151,11 @@ async fn an_unknown_item_and_an_unknown_version_answer_fixed_codes() {
         (not_a_version.status.as_u16(), not_a_version.json()),
         (404, json!({"error": "unknown_version"}))
     );
+    assert_eq!(
+        unknown_item.headers.get("cache-control").unwrap(),
+        "private, no-store",
+        "no cache keeps a refusal"
+    );
 }
 
 #[tokio::test]

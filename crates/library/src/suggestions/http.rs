@@ -7,15 +7,16 @@
 use axum::Router;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use super::{Accepted, SuggestionError};
 use crate::Library;
 use crate::accounts::http::signed_in;
+use crate::answers::{private as answer, refused};
 
 pub fn router(library: Library) -> Router {
     Router::new()
@@ -23,22 +24,6 @@ pub fn router(library: Library) -> Router {
         .route("/api/account/suggestions", get(of_account))
         .route("/api/account/items/{item}/suggestions/accept", post(accept))
         .with_state(library)
-}
-
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "private, no-store"),
-        ],
-        body.to_string(),
-    )
-        .into_response()
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    answer(status, json!({"error": code}))
 }
 
 fn suggestion_refused(error: SuggestionError) -> Response {

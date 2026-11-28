@@ -8,6 +8,7 @@
 pub mod contract;
 
 mod accounts;
+mod answers;
 mod authors_withdrawal;
 mod bank_format;
 mod browse;

@@ -11,10 +11,11 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use serde::Deserialize;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use super::{AccountError, Desk, MinuteJarAccount, Opening, Session, SignInError};
 use crate::Library;
+use crate::answers::{NO_STORE, private as answer};
 
 pub fn router(library: Library) -> Router {
     Router::new()
@@ -213,18 +214,4 @@ async fn rename(State(library): State<Library>, headers: HeaderMap, request: Byt
     let rename: Rename = body(&request)?;
     let account = super::rename(&library.pool, &session, &rename.pseudonym).await?;
     Ok(answer(StatusCode::OK, json!(account)))
-}
-
-const NO_STORE: &str = "private, no-store";
-
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, NO_STORE),
-        ],
-        body.to_string(),
-    )
-        .into_response()
 }

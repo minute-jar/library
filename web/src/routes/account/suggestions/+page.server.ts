@@ -6,7 +6,7 @@
 import { error, fail, redirect } from '@sveltejs/kit';
 import { localizeHref } from '#lib/paraglide/runtime.js';
 import { Unavailable } from '#lib/server/catalogue.ts';
-import { Refused, SESSION_COOKIE } from '#lib/server/accounts.ts';
+import { Refused, SESSION_COOKIE, signedOut } from '#lib/server/accounts.ts';
 import { type Accepted, type ItemSuggestions, suggestions } from '#lib/server/suggestions.ts';
 import type { Actions, PageServerLoad } from './$types';
 
@@ -42,7 +42,7 @@ function ticked(form: FormData): Accepted[] {
 export const actions = {
 	accept: async ({ fetch, cookies, request }) => {
 		const session = cookies.get(SESSION_COOKIE);
-		if (!session) return fail(401, { refused: 'signed_out', item: '' });
+		if (!session) return signedOut({ item: '' });
 		const form = await request.formData();
 		const item = form.get('item');
 		if (typeof item !== 'string') return fail(400, { refused: 'bad_request', item: '' });

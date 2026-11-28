@@ -22,6 +22,7 @@ use super::{
 };
 use crate::Library;
 use crate::accounts::http::{Refusal, signed_in};
+use crate::answers::{NO_STORE, private as answer, refused};
 use crate::contract::time;
 use crate::reports::{DecideError, Decision, Outcome};
 use crate::shares::held::{HeldDecision, HeldDecisionError, HeldOutcome};
@@ -51,40 +52,29 @@ pub fn router(library: Library) -> Router {
 
 type Answer = Result<Response, Refused>;
 
-/// A refusal: a fixed code, or the session's own (`signed_out`, `unavailable`).
-pub(crate) enum Refused {
-    Code(StatusCode, &'static str),
-    Session(Refusal),
+/// A refusal as it answers: a fixed code, or the session's own
+/// (`signed_out`, `unavailable`).
+pub(crate) struct Refused(Box<Response>);
+
+impl From<Response> for Refused {
+    fn from(response: Response) -> Self {
+        Refused(Box::new(response))
+    }
+}
+
+impl From<Refusal> for Refused {
+    fn from(refusal: Refusal) -> Self {
+        refusal.into_response().into()
+    }
 }
 
 impl IntoResponse for Refused {
     fn into_response(self) -> Response {
-        match self {
-            Refused::Code(status, code) => answer(status, json!({"error": code})),
-            Refused::Session(refusal) => refusal.into_response(),
-        }
+        *self.0
     }
 }
 
-const NO_STORE: &str = "private, no-store";
-
-fn answer(status: StatusCode, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, NO_STORE),
-        ],
-        body.to_string(),
-    )
-        .into_response()
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Refused {
-    Refused::Code(status, code)
-}
-
-fn unavailable<E>(_: E) -> Refused {
+fn unavailable<E>(_: E) -> Response {
     refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable")
 }
 
@@ -99,15 +89,13 @@ pub(crate) async fn moderator(
     library: &Library,
     headers: &HeaderMap,
 ) -> Result<Moderator, Refused> {
-    let (session, now) = signed_in(library, headers)
-        .await
-        .map_err(Refused::Session)?;
+    let (session, now) = signed_in(library, headers).await.map_err(Refused::from)?;
     super::handle_of(&library.pool, &session.subject)
         .await
         .map_err(unavailable)?
         .ok_or_else(|| refused(StatusCode::FORBIDDEN, "not_a_moderator"))?;
     if !session.recently_passkey(now) {
-        return Err(refused(StatusCode::FORBIDDEN, "passkey_sign_in_required"));
+        return Err(refused(StatusCode::FORBIDDEN, "passkey_sign_in_required").into());
     }
     Ok(Moderator {
         subject: session.subject,
@@ -117,21 +105,20 @@ pub(crate) async fn moderator(
 
 /// Reads a JSON body that must be exactly `T`.
 fn body<T: for<'de> Deserialize<'de>>(body: &Bytes) -> Result<T, Refused> {
-    serde_json::from_slice(body).map_err(|_| refused(StatusCode::BAD_REQUEST, "bad_request"))
+    serde_json::from_slice(body).map_err(|_| refused(StatusCode::BAD_REQUEST, "bad_request").into())
 }
 
 fn decide_refusal(error: DecideError) -> Refused {
-    match error {
+    let response = match error {
         DecideError::UnknownReport => refused(StatusCode::NOT_FOUND, "unknown_report"),
         DecideError::UnknownAppeal => refused(StatusCode::NOT_FOUND, "unknown_appeal"),
         DecideError::AlreadyDecided => refused(StatusCode::CONFLICT, "already_decided"),
         DecideError::ReasonsRequired => refused(StatusCode::BAD_REQUEST, "reasons_required"),
         DecideError::NotAModerator => refused(StatusCode::FORBIDDEN, "not_a_moderator"),
         DecideError::SameModerator => refused(StatusCode::FORBIDDEN, "same_moderator"),
-        DecideError::Unavailable | DecideError::Database(_) => {
-            refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable")
-        }
-    }
+        DecideError::Unavailable | DecideError::Database(_) => unavailable(()),
+    };
+    response.into()
 }
 
 fn decided() -> Response {
@@ -442,10 +429,10 @@ struct WebsiteAppeal {
 /// routes' plain `Cache-Control: no-store`.
 async fn receive_appeal(library: &Library, report: &str, appeal: Appeal) -> Answer {
     let Some(desk) = &library.reports else {
-        return Err(unavailable(()));
+        return Err(unavailable(()).into());
     };
     let now = (desk.clock)();
-    let refusal = |status: StatusCode, code: &'static str| Err(refused(status, code));
+    let refusal = |status: StatusCode, code: &'static str| Err(refused(status, code).into());
     match library.appeal(report, appeal, now).await {
         Ok(id) => Ok((
             StatusCode::ACCEPTED,

@@ -71,7 +71,10 @@
 					<p class="font-medium">{m.timeline_corrected()}</p>
 				{:else if entry.event === 'decided'}
 					<p class="font-medium">
-						{m.timeline_decided({ outcome: outcomeWord(entry.outcome), moderator: entry.moderator })}
+						{m.timeline_decided({
+							outcome: outcomeWord(entry.outcome),
+							moderator: entry.moderator
+						})}
 					</p>
 					<p class="whitespace-pre-line">{entry.reasons}</p>
 				{:else if entry.event === 'appealed'}

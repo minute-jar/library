@@ -6,13 +6,14 @@
 
 use axum::Router;
 use axum::extract::{Path, State};
-use axum::http::{HeaderMap, StatusCode, header};
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::accounts::http::signed_in;
+use crate::answers::{json, refused};
 use crate::browse::{ENTRY_COLUMNS, Row, entry};
 use crate::{Library, SuggestionError};
 
@@ -109,7 +110,7 @@ async fn public(State(library): State<Library>, Path(pseudonym): Path<String>) -
         }
     };
     match found.await {
-        Ok(Some(profile)) if !is_empty(&profile) => answer(StatusCode::OK, PROFILE_CACHE, profile),
+        Ok(Some(profile)) if !is_empty(&profile) => json(StatusCode::OK, PROFILE_CACHE, profile),
         Ok(_) => refused(StatusCode::NOT_FOUND, "unknown_author"),
         Err(_) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
@@ -147,7 +148,7 @@ async fn own(State(library): State<Library>, headers: HeaderMap) -> Response {
         Ok(Some(profile))
     };
     match found.await {
-        Ok(Some(profile)) => answer(StatusCode::OK, "private, no-store", profile),
+        Ok(Some(profile)) => json(StatusCode::OK, crate::answers::NO_STORE, profile),
         Ok(None) => refused(StatusCode::NOT_FOUND, "no_account"),
         Err(Unavailable) => refused(StatusCode::SERVICE_UNAVAILABLE, "unavailable"),
     }
@@ -181,25 +182,4 @@ async fn received(library: &Library, item: &str) -> Result<Value, Unavailable> {
         .map(|standing| standing.questions.iter().map(|q| q.answers.len()).sum())
         .unwrap_or(0);
     Ok(json!({"families": families, "answers": answers}))
-}
-
-fn answer(status: StatusCode, cache: &'static str, body: Value) -> Response {
-    (
-        status,
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, cache),
-        ],
-        body.to_string(),
-    )
-        .into_response()
-}
-
-fn refused(status: StatusCode, code: &'static str) -> Response {
-    (
-        status,
-        [(header::CONTENT_TYPE, "application/json")],
-        json!({"error": code}).to_string(),
-    )
-        .into_response()
 }

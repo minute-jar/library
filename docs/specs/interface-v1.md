@@ -437,3 +437,4 @@ Content-Type: application/json
 - The bytes served are the same for every caller; nothing in a request changes them.
 - An unknown item answers `404` with `{"error": "unknown_item"}`, an unknown version of a known item `404` with `{"error": "unknown_version"}`.
 - A digest that no published version lists, or that is not 64 lowercase hexadecimal digits, answers `404` with `{"error": "unknown_media"}`.
+- Every refusal is `application/json` `{"error": "<code>"}` with `Cache-Control: private, no-store`: no cache keeps it.
