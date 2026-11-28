@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('an author accepts answers families suggested into a new version', async ({ page }) => {
 	await page.goto('/account');
 	await page.getByRole('link', { name: 'Sign in with your Minute Jar account' }).click();
-	await page.getByRole('textbox', { name: 'Pseudonym' }).fill('Plover');
+	await page.getByRole('textbox', { name: 'Pseudonym' }).fill('Lapwing');
 	await page.getByRole('radio', { name: /A separate account for the library/ }).check();
 	await page.getByRole('checkbox', { name: /I am an adult and a parent/ }).check();
 	await page.getByRole('button', { name: 'Open my library account' }).click();
