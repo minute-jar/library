@@ -291,5 +291,11 @@
 	"items_withdrawn_now": "Withdrawn.",
 	"items_strong": "To withdraw an item, sign in again first.",
 	"refused_withdrawal_confirmation": "Confirm that you understand the withdrawal cannot be undone.",
-	"refused_already_withdrawn": "This is withdrawn already."
+	"refused_already_withdrawn": "This is withdrawn already.",
+	"author_title": "{pseudonym}, author",
+	"author_summary": "{items} shared items, used by {families} families.",
+	"author_own": "This is your author profile as everyone sees it. You alone also see the suggestions your items received: no one else does.",
+	"author_none": "None of your items shows in the catalogue yet.",
+	"author_suggestions": "Suggestions from {families} families, {answers} answers waiting",
+	"author_link": "Your author profile"
 }

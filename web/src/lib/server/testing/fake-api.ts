@@ -63,6 +63,7 @@ export const verbsPage: ItemPage = {
 	},
 	media: [],
 	editorial: null,
+	profile: 'Owl',
 	versions: [
 		{ version: 2, published_at: '2026-11-20T18:00:00Z' },
 		{ version: 1, published_at: '2026-11-18T09:00:00Z' }

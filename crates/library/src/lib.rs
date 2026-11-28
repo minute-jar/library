@@ -20,6 +20,7 @@ mod imports;
 mod item_page;
 mod media;
 mod moderation;
+mod profiles;
 mod ratings;
 mod reports;
 mod review;
@@ -637,6 +638,7 @@ impl Library {
             .merge(comments::http::router(self.clone()))
             .merge(editorial::selection::router(self.clone()))
             .merge(authors_withdrawal::router(self.clone()))
+            .merge(profiles::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,
             ))
