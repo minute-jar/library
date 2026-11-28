@@ -157,7 +157,10 @@ async fn an_editorial_share_names_a_moderator_and_a_past_instant() {
         assert_eq!(shared.status, StatusCode::BAD_REQUEST, "{read}");
         assert_eq!(shared.json(), json!({"error": "bad_reading"}), "{read}");
     }
-    assert!(sharing.reviewer.asked().is_empty(), "nothing was reviewed");
+    assert!(
+        sharing.review_provider.asked().is_empty(),
+        "nothing was reviewed"
+    );
 }
 
 #[tokio::test]
@@ -240,9 +243,11 @@ async fn a_held_editorial_share_keeps_its_marks_once_a_moderator_publishes_it() 
         .grant_moderator("moderator-heron-subject", "Heron", sharing.clock.now())
         .await
         .unwrap();
-    sharing.reviewer.answer(Some(library::ReviewOutcome::Held {
-        findings: "Question 1 may be wrong.".into(),
-    }));
+    sharing
+        .review_provider
+        .answer(Some(library::ReviewOutcome::Held {
+            findings: "Question 1 may be wrong.".into(),
+        }));
     let shared = sharing.share(&session, read_by_operator()).await;
     assert_eq!(shared.status, StatusCode::ACCEPTED, "{}", text(&shared));
     let shared = shared.json();

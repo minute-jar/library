@@ -30,7 +30,7 @@ async fn a_share_the_review_publishes_enters_the_index_under_the_pseudonym() {
     assert_eq!(answer["version"], 1);
     assert_eq!(answer["reasons"], json!([]));
 
-    let asked = sharing.reviewer.asked();
+    let asked = sharing.review_provider.asked();
     assert_eq!(asked.len(), 1);
     assert_eq!(asked[0].item, item);
     assert_eq!(asked[0].version, 1);
@@ -65,7 +65,7 @@ async fn a_share_the_review_publishes_enters_the_index_under_the_pseudonym() {
 async fn a_share_held_for_a_moderator_stays_out_of_the_index() {
     let sharing = with_sharing().await;
     let session = sharing.author(SUBJECT, "Owl").await;
-    sharing.reviewer.answer(Some(ReviewOutcome::Held {
+    sharing.review_provider.answer(Some(ReviewOutcome::Held {
         findings: "Question 2 may name a school.".into(),
     }));
 
@@ -96,7 +96,7 @@ fn wrong_answer() -> RefusalReason {
 async fn a_refused_share_answers_its_reasons_per_question_and_publishes_nothing() {
     let sharing = with_sharing().await;
     let session = sharing.author(SUBJECT, "Owl").await;
-    sharing.reviewer.answer(Some(ReviewOutcome::Refused {
+    sharing.review_provider.answer(Some(ReviewOutcome::Refused {
         reasons: vec![
             wrong_answer(),
             RefusalReason {
@@ -130,7 +130,7 @@ async fn the_author_sees_every_share_its_outcome_and_the_days_quota() {
     let session = sharing.author(SUBJECT, "Owl").await;
     let published = sharing.share(&session, prepared("Verbs 1")).await.json();
     sharing.clock.advance(SignedDuration::from_mins(1));
-    sharing.reviewer.answer(Some(ReviewOutcome::Refused {
+    sharing.review_provider.answer(Some(ReviewOutcome::Refused {
         reasons: vec![wrong_answer()],
     }));
     sharing.share(&session, prepared_again("Verbs 2")).await;
@@ -171,7 +171,7 @@ async fn the_first_share_needs_the_sharing_terms_accepted() {
         assert_eq!(refused.status, StatusCode::FORBIDDEN, "{}", text(refused));
         assert_eq!(refused.json(), json!({"error": "sharing_terms_required"}));
     }
-    assert!(sharing.reviewer.asked().is_empty());
+    assert!(sharing.review_provider.asked().is_empty());
     assert_eq!(
         sharing.shares(&session).await.json()["sharing_terms"],
         json!({"current": TERMS, "accepted": null})
@@ -236,7 +236,7 @@ async fn a_share_carrying_a_library_identifier_is_refused_untouched() {
         refused.json(),
         json!({"error": "library_identifier_not_allowed"})
     );
-    assert!(sharing.reviewer.asked().is_empty());
+    assert!(sharing.review_provider.asked().is_empty());
     assert!(
         tables_holding(&sharing.database, FAMILY_A).await.is_empty(),
         "the identifier is kept nowhere"
@@ -280,11 +280,11 @@ async fn sharing_needs_a_recent_strong_sign_in_an_account_and_a_verified_card() 
     let refused = sharing.share(&author, prepared("Verbs")).await;
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert_eq!(refused.json(), json!({"error": "strong_sign_in_required"}));
-    assert!(sharing.reviewer.asked().is_empty());
+    assert!(sharing.review_provider.asked().is_empty());
 }
 
 #[tokio::test]
-async fn without_a_reviewer_sharing_is_unavailable() {
+async fn without_a_review_provider_sharing_is_unavailable() {
     let (library, provider, clock, payments, _) = common::cards::with_cards().await;
     payments.subscribe(SUBJECT, "fp");
     let session = common::cards::account(
@@ -314,7 +314,7 @@ async fn without_a_reviewer_sharing_is_unavailable() {
 async fn a_review_that_fails_shares_nothing_and_counts_nothing() {
     let sharing = with_sharing().await;
     let session = sharing.author(SUBJECT, "Owl").await;
-    sharing.reviewer.answer(None);
+    sharing.review_provider.answer(None);
 
     let failed = sharing.share(&session, prepared("Verbs")).await;
 
@@ -329,7 +329,7 @@ async fn a_review_that_fails_shares_nothing_and_counts_nothing() {
 async fn the_quota_of_shares_per_day_is_explained_when_reached() {
     let sharing = with_sharing().await;
     let session = sharing.author(SUBJECT, "Owl").await;
-    sharing.reviewer.answer(Some(ReviewOutcome::Refused {
+    sharing.review_provider.answer(Some(ReviewOutcome::Refused {
         reasons: vec![wrong_answer()],
     }));
     for n in 0..SHARES_PER_DAY {
@@ -348,7 +348,7 @@ async fn the_quota_of_shares_per_day_is_explained_when_reached() {
         refused.json(),
         json!({"error": "share_quota_reached", "shares_per_day": 10, "next_share_at": "2026-11-28T00:00:00Z"})
     );
-    assert_eq!(sharing.reviewer.asked().len(), 10);
+    assert_eq!(sharing.review_provider.asked().len(), 10);
     assert_eq!(
         sharing.shares(&session).await.json()["quota"],
         json!({"shares_per_day": 10, "shared_today": 10, "next_share_at": "2026-11-28T00:00:00Z"})
@@ -389,7 +389,7 @@ async fn content_outside_the_bank_format_is_refused_before_the_review() {
         assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{error}");
         assert_eq!(refused.json(), json!({"error": error}));
     }
-    assert!(sharing.reviewer.asked().is_empty());
+    assert!(sharing.review_provider.asked().is_empty());
 }
 
 #[tokio::test]

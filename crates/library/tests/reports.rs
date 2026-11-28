@@ -14,7 +14,7 @@ use jiff::Timestamp;
 use library::contract::Kind;
 use library::{
     Decision, Library, Message, Notifier, NotifyFuture, Outcome, Reason, ReviewFuture,
-    ReviewOutcome, Reviewer, Submission,
+    ReviewOutcome, ReviewProvider, Submission,
 };
 use serde_json::{Value, json};
 
@@ -26,20 +26,20 @@ fn received() -> Timestamp {
     at("2026-11-26T10:00:00Z")
 }
 
-/// What the reviewer was asked: the item, its version and the reason to check.
+/// What the review provider was asked: the item, its version and the reason to check.
 type Asked = (String, u32, Option<Reason>);
 
-/// A reviewer that answers the same outcome to every submission, and
+/// A review provider that answers the same outcome to every submission, and
 /// remembers what it was asked.
 #[derive(Clone)]
-struct FakeReviewer {
+struct FakeReviewProvider {
     outcome: Arc<Mutex<Option<ReviewOutcome>>>,
     asked: Arc<Mutex<Vec<Asked>>>,
 }
 
-impl FakeReviewer {
+impl FakeReviewProvider {
     fn answering(outcome: Option<ReviewOutcome>) -> Self {
-        FakeReviewer {
+        FakeReviewProvider {
             outcome: Arc::new(Mutex::new(outcome)),
             asked: Arc::default(),
         }
@@ -50,7 +50,7 @@ impl FakeReviewer {
     }
 }
 
-impl Reviewer for FakeReviewer {
+impl ReviewProvider for FakeReviewProvider {
     fn review<'a>(&'a self, submission: Submission<'a>) -> ReviewFuture<'a> {
         self.asked.lock().unwrap().push((
             submission.item.to_string(),
@@ -86,22 +86,22 @@ impl Notifier for FakeNotifier {
 
 struct Moderated {
     library: Library,
-    reviewer: FakeReviewer,
+    review_provider: FakeReviewProvider,
     notifier: FakeNotifier,
 }
 
-/// A library holding the verbs bank and the fractions bank, whose reviewer
+/// A library holding the verbs bank and the fractions bank, whose review provider
 /// finds nothing unless told otherwise.
 async fn moderated() -> Moderated {
     moderated_with(Some(ReviewOutcome::Published)).await
 }
 
 async fn moderated_with(outcome: Option<ReviewOutcome>) -> Moderated {
-    let reviewer = FakeReviewer::answering(outcome);
+    let review_provider = FakeReviewProvider::answering(outcome);
     let notifier = FakeNotifier::default();
     let library = library()
         .await
-        .with_reports(reviewer.clone(), notifier.clone(), received);
+        .with_reports(review_provider.clone(), notifier.clone(), received);
     library
         .publish_version(verbs("Irregular verbs"), at("2026-11-20T18:00:00Z"))
         .await
@@ -118,7 +118,7 @@ async fn moderated_with(outcome: Option<ReviewOutcome>) -> Moderated {
     library.refresh(at("2026-11-26T09:00:00Z")).await.unwrap();
     Moderated {
         library,
-        reviewer,
+        review_provider,
         notifier,
     }
 }
@@ -191,7 +191,7 @@ async fn a_wrong_answer_is_sent_to_the_author_and_acknowledged_with_the_report()
             .unwrap()
             .is_empty()
     );
-    assert!(moderated.reviewer.asked().is_empty());
+    assert!(moderated.review_provider.asked().is_empty());
 }
 
 #[tokio::test]
@@ -349,7 +349,7 @@ async fn a_plausible_report_of_personal_data_switches_the_item_off_at_once() {
     let id = report_id(&report(&moderated.library, FAMILY_A, VERBS, "personal_data").await);
 
     assert_eq!(
-        moderated.reviewer.asked(),
+        moderated.review_provider.asked(),
         vec![(VERBS.to_string(), 1, Some(Reason::PersonalData))]
     );
     let withdrawals =
@@ -554,7 +554,7 @@ async fn two_families_that_imported_the_item_switch_it_off_without_review() {
         )]
     );
     assert_eq!(
-        moderated.reviewer.asked().len(),
+        moderated.review_provider.asked().len(),
         1,
         "only the first was reviewed"
     );
@@ -625,7 +625,7 @@ async fn rights_hide_the_item_after_three_distinct_families_that_imported_it() {
     let withdrawals =
         fetch_verified(&moderated.library, "/v1/withdrawals", Kind::Withdrawals).await;
     assert!(listed(&withdrawals).is_empty());
-    assert!(moderated.reviewer.asked().is_empty());
+    assert!(moderated.review_provider.asked().is_empty());
 }
 
 #[tokio::test]
@@ -764,7 +764,7 @@ async fn a_report_answer_carries_nothing_to_keep_and_no_cookie() {
 }
 
 #[tokio::test]
-async fn a_library_opened_without_a_reviewer_refuses_reports() {
+async fn a_library_opened_without_a_review_provider_refuses_reports() {
     let library = library().await;
     library
         .publish_version(verbs("Irregular verbs"), at("2026-11-20T18:00:00Z"))

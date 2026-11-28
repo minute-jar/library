@@ -52,7 +52,7 @@ async fn a_comment_the_review_publishes_shows_on_the_item_page_under_the_pseudon
             "published_at": "2026-11-27T10:00:00Z",
         }])
     );
-    let asked = commenting.sharing.reviewer.asked();
+    let asked = commenting.sharing.review_provider.asked();
     assert_eq!(asked.len(), 1);
     assert_eq!(asked[0].item, VERBS);
     assert_eq!(asked[0].version, 1);
@@ -148,7 +148,7 @@ async fn a_comment_needs_a_library_account_with_a_verified_card() {
     assert_eq!(without_account.json(), json!({"error": "no_account"}));
     assert_eq!(without_card.status, StatusCode::FORBIDDEN);
     assert_eq!(without_card.json(), json!({"error": "card_required"}));
-    assert!(commenting.sharing.reviewer.asked().is_empty());
+    assert!(commenting.sharing.review_provider.asked().is_empty());
 }
 
 #[tokio::test]
@@ -299,7 +299,7 @@ async fn a_comment_names_no_one_and_carries_no_library_identifier() {
         joined.json(),
         json!({"error": "library_identifier_not_allowed"})
     );
-    assert!(commenting.sharing.reviewer.asked().is_empty());
+    assert!(commenting.sharing.review_provider.asked().is_empty());
 }
 
 #[tokio::test]

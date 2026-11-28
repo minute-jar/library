@@ -18,7 +18,7 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 
 use crate::accounts::Session;
-use crate::review::{RefusalReason, ReviewOutcome, Reviewer, Submission};
+use crate::review::{RefusalReason, ReviewOutcome, ReviewProvider, Submission};
 
 /// The longest comment, in characters.
 pub const COMMENT_LENGTH: usize = 1000;
@@ -30,7 +30,7 @@ pub const COMMENTS_PER_DAY: u32 = 20;
 
 /// The comments part of the service, once turned on.
 pub(crate) struct Desk {
-    pub reviewer: Box<dyn Reviewer>,
+    pub provider: Box<dyn ReviewProvider>,
     /// The clock the anonymous routes read the instant from.
     pub clock: Box<dyn Fn() -> Timestamp + Send + Sync>,
 }
@@ -197,7 +197,7 @@ pub(crate) async fn comment(
     let comment = reserve(pool, &commenter, item, &text, now).await?;
     let content = json!({"comment": text});
     let outcome = desk
-        .reviewer
+        .provider
         .review(Submission {
             item,
             version: version as u32,

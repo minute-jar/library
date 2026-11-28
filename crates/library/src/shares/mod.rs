@@ -23,7 +23,7 @@ use serde_json::Value;
 use sqlx::PgPool;
 
 use crate::accounts::Session;
-use crate::review::{RefusalReason, ReviewOutcome, Reviewer, Submission};
+use crate::review::{RefusalReason, ReviewOutcome, ReviewProvider, Submission};
 use crate::{Author, Curriculum, ItemType, Library, Metadata, NewVersion, Origin, PublishError};
 use versions::NamedOrigin;
 
@@ -38,7 +38,7 @@ pub const SHARES_PER_DAY: u32 = 10;
 
 /// The sharing part of the service, once turned on.
 pub(crate) struct Desk {
-    pub reviewer: Box<dyn Reviewer>,
+    pub provider: Box<dyn ReviewProvider>,
 }
 
 /// Why a share is refused before the review.
@@ -396,7 +396,7 @@ pub(crate) async fn share(
     }
     let share = reserve(pool, &sharer, &version.title, now).await?;
     let outcome = desk
-        .reviewer
+        .provider
         .review(Submission {
             item: &item,
             version: lineage.version,

@@ -36,7 +36,7 @@ async fn held() -> Held {
             .unwrap();
     }
     let author = sharing.author(SUBJECT, "Owl").await;
-    sharing.reviewer.answer(Some(ReviewOutcome::Held {
+    sharing.review_provider.answer(Some(ReviewOutcome::Held {
         findings: "Question 2 may name a school.".into(),
     }));
     let shared = sharing.share(&author, prepared("Irregular verbs")).await;

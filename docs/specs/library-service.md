@@ -141,7 +141,7 @@ Words such as "random identifier" or "noised totals" appear only behind "Learn m
 
 ## Testing Decisions
 
-- A good test drives the service through its HTTP interface and checks what a caller sees, with time, the AI reviewer and billing passed in as fakes.
+- A good test drives the service through its HTTP interface and checks what a caller sees, with time, the AI review provider and billing passed in as fakes.
 - The interface contract's signed fixtures from the main repository run against this service.
 - Cases: account creation and its checks; a share published, held and refused; a new version re-reviewed; derived works keeping attribution; the three report paths and their thresholds; switch-off and automatic reactivation; the formal notice; withdrawals in the signed list; ratings once per identifier and only after import; comments held by review; no request joining a library identifier to an account; contributions below and above the publication threshold.
 

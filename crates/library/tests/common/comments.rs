@@ -21,7 +21,7 @@ pub async fn with_commenting() -> Commenting {
     sharing.library = sharing
         .library
         .clone()
-        .with_comments(sharing.reviewer.clone(), {
+        .with_comments(sharing.review_provider.clone(), {
             let clock = sharing.clock.clone();
             move || clock.now()
         });
@@ -45,7 +45,7 @@ impl Commenting {
 
     /// The outcome the review answers next; `None` for a review that fails.
     pub fn review(&self, outcome: Option<ReviewOutcome>) {
-        self.sharing.reviewer.answer(outcome);
+        self.sharing.review_provider.answer(outcome);
     }
 
     pub async fn comment_on(&self, item: &str, session: &str, body: Value) -> Answer {

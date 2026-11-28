@@ -8,7 +8,8 @@ use std::sync::{Arc, Mutex};
 
 use axum::http::StatusCode;
 use library::{
-    Library, Message, Notifier, NotifyFuture, ReviewFuture, ReviewOutcome, Reviewer, Submission,
+    Library, Message, Notifier, NotifyFuture, ReviewFuture, ReviewOutcome, ReviewProvider,
+    Submission,
 };
 use serde_json::{Value, json};
 
@@ -16,7 +17,7 @@ use super::Answer;
 use super::cards::*;
 use super::identity::*;
 
-/// What the reviewer was asked: the item, its version, title, language and content.
+/// What the review provider was asked: the item, its version, title, language and content.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Asked {
     pub item: String,
@@ -26,24 +27,24 @@ pub struct Asked {
     pub content: Value,
 }
 
-/// A reviewer that answers the outcome a test sets, or fails when none is
+/// A review provider that answers the outcome a test sets, or fails when none is
 /// set, and remembers what it was asked.
 #[derive(Clone)]
-pub struct FakeReviewer {
+pub struct FakeReviewProvider {
     outcome: Arc<Mutex<Option<ReviewOutcome>>>,
     asked: Arc<Mutex<Vec<Asked>>>,
 }
 
-impl Default for FakeReviewer {
+impl Default for FakeReviewProvider {
     fn default() -> Self {
-        FakeReviewer {
+        FakeReviewProvider {
             outcome: Arc::new(Mutex::new(Some(ReviewOutcome::Published))),
             asked: Arc::default(),
         }
     }
 }
 
-impl FakeReviewer {
+impl FakeReviewProvider {
     pub fn answer(&self, outcome: Option<ReviewOutcome>) {
         *self.outcome.lock().unwrap() = outcome;
     }
@@ -53,7 +54,7 @@ impl FakeReviewer {
     }
 }
 
-impl Reviewer for FakeReviewer {
+impl ReviewProvider for FakeReviewProvider {
     fn review<'a>(&'a self, submission: Submission<'a>) -> ReviewFuture<'a> {
         assert_eq!(submission.focus, None, "a share is reviewed whole");
         self.asked.lock().unwrap().push(Asked {
@@ -73,14 +74,14 @@ pub struct Sharing {
     pub provider: FakeProvider,
     pub clock: Clock,
     pub payments: FakePayments,
-    pub reviewer: FakeReviewer,
+    pub review_provider: FakeReviewProvider,
     pub database: String,
 }
 
 /// The review of reports, which finds nothing.
 struct FindingNothing;
 
-impl Reviewer for FindingNothing {
+impl ReviewProvider for FindingNothing {
     fn review<'a>(&'a self, _: Submission<'a>) -> ReviewFuture<'a> {
         Box::pin(async { Ok(ReviewOutcome::Published) })
     }
@@ -98,18 +99,19 @@ impl Notifier for Silent {
 /// A library with accounts, cards, sharing and reports, over fakes.
 pub async fn with_sharing() -> Sharing {
     let (library, provider, clock, payments, database) = with_cards().await;
-    let reviewer = FakeReviewer::default();
+    let review_provider = FakeReviewProvider::default();
     let reading = clock.clone();
-    let library =
-        library
-            .with_sharing(reviewer.clone())
-            .with_reports(FindingNothing, Silent, move || reading.now());
+    let library = library.with_sharing(review_provider.clone()).with_reports(
+        FindingNothing,
+        Silent,
+        move || reading.now(),
+    );
     Sharing {
         library,
         provider,
         clock,
         payments,
-        reviewer,
+        review_provider,
         database,
     }
 }

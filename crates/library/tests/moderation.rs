@@ -15,15 +15,15 @@ use common::*;
 use jiff::SignedDuration;
 use library::contract::Kind;
 use library::{
-    IdToken, Library, Message, Notifier, NotifyFuture, ReviewFuture, ReviewOutcome, Reviewer,
+    IdToken, Library, Message, Notifier, NotifyFuture, ReviewFuture, ReviewOutcome, ReviewProvider,
     Submission,
 };
 use serde_json::{Value, json};
 
-/// A reviewer that finds nothing.
+/// A review provider that finds nothing.
 struct Publishing;
 
-impl Reviewer for Publishing {
+impl ReviewProvider for Publishing {
     fn review<'a>(&'a self, _: Submission<'a>) -> ReviewFuture<'a> {
         Box::pin(async { Ok::<_, io::Error>(ReviewOutcome::Published) })
     }

@@ -434,7 +434,7 @@ async fn the_prepared_new_version_goes_through_the_share_route_and_leaves_the_su
     assert_eq!(shared.status, StatusCode::CREATED, "{}", text(&shared));
     assert_eq!(shared.json()["item"], json!(item));
     assert_eq!(shared.json()["version"], 2);
-    let asked = sharing.reviewer.asked();
+    let asked = sharing.review_provider.asked();
     assert_eq!(asked.last().unwrap().version, 2);
     assert_eq!(
         asked.last().unwrap().content["questions"][0]["answers"],

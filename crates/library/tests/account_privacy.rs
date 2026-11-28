@@ -169,8 +169,8 @@ async fn no_route_answers_the_e_mail_or_the_minute_jar_account() {
     // With cards and sharing on, so that their routes answer as in deployment.
     let (library, provider, _, _, _) = common::cards::with_cards().await;
     let library = library
-        .with_sharing(common::shares::FakeReviewer::default())
-        .with_comments(common::shares::FakeReviewer::default(), signed_in_at);
+        .with_sharing(common::shares::FakeReviewProvider::default())
+        .with_comments(common::shares::FakeReviewProvider::default(), signed_in_at);
     library
         .publish_version(
             library::NewVersion {
