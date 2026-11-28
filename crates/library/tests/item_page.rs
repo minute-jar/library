@@ -69,6 +69,7 @@ async fn the_item_page_shows_the_latest_version_with_its_content_and_every_versi
                 "lessons": [{"title": "Strong verbs", "text": "Their vowel changes."}]
             },
             "media": [{"digest": PIXEL, "type": "image/png", "size": 70}],
+            "editorial": null,
             "versions": [
                 {"version": 2, "published_at": "2026-11-22T10:00:00Z"},
                 {"version": 1, "published_at": "2026-11-20T18:00:00Z"}

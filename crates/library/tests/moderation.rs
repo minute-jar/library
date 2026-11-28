@@ -391,6 +391,7 @@ async fn the_history_of_an_item_shows_its_reports_and_decisions_oldest_first() {
                 {"at": "2026-11-27T10:02:00Z", "event": "reported", "report": second,
                  "reason": "rights", "details": "Copied from a workbook", "effect": "none", "findings": null, "notice": null},
             ],
+            "selection": null,
         })
     );
     let unknown = desk
