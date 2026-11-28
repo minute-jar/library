@@ -9,9 +9,9 @@
 //! - `LIBRARY_LISTEN`: the address to listen on, `127.0.0.1:8080` by default;
 //! - `LIBRARY_IDENTIFICATION_DAYS`: how many days the identification data of
 //!   a closed library account is kept after its last share, 365 by default
-//!   (ticket 26).
+//!   (issue #27).
 //!
-//! Reports answer `503` until a review adapter (ticket 13) and a notifier
+//! Reports answer `503` until a review adapter (issue #14) and a notifier
 //! are wired here with `Library::with_reports`.
 //!
 //! Sign-in with a Minute Jar account stays off (its routes answer
@@ -19,7 +19,7 @@
 //! identity service of `minute-jar/hosting` (ADR-0006).
 //!
 //! Sharing (`POST /api/shares`) answers `503` until the review adapter
-//! (ticket 13) is wired here with `Library::with_sharing`; it needs sign-in
+//! (issue #14) is wired here with `Library::with_sharing`; it needs sign-in
 //! and card verification too.
 //!
 //! Card verification stays off too (its routes answer `unavailable`) until

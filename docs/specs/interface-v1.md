@@ -7,7 +7,7 @@ status: draft
 
 The wire format of the signed documents a library serves to family servers (ADR-0004). It makes concrete the interface contract of the main repository (`docs/specs/public-library.md`, "Interface between a family server and a library") and is proposed there as its version 1. The fixtures in `fixtures/v1/` are signed with public test keys and let a family server's library client and a library check each other.
 
-This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports, ratings, reports and shares. Suggestions are added by a later ticket of `docs/tickets/step-1.md`.
+This version covers the keys document, the index, shared items and their media, item files for family servers without Internet access, the withdrawal list, imports, ratings, suggestions, reports and shares.
 
 ## Signed documents
 

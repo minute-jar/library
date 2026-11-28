@@ -488,7 +488,7 @@ pub(crate) async fn share(
         }
     };
     // The sharing log: the identification data is kept for the legal
-    // period after the last share (ticket 26).
+    // period after the last share (issue #27).
     sqlx::query("UPDATE identifications SET last_shared_at = $2 WHERE account = $1")
         .bind(sharer.id)
         .bind(now.as_second())

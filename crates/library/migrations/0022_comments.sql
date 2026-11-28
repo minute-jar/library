@@ -1,4 +1,4 @@
--- Comments from library accounts (ticket 21, docs/specs/catalogue-api.md,
+-- Comments from library accounts (issue #22, docs/specs/catalogue-api.md,
 -- Comments): every comment is reviewed before it shows, and can be
 -- reported. A comment is addressed to an item, never to an account: no
 -- table here joins one account to another.

@@ -47,7 +47,7 @@ CREATE TABLE library_accounts (
 CREATE UNIQUE INDEX library_accounts_by_pseudonym ON library_accounts (lower(pseudonym));
 
 -- The identification data of a library account, which no route answers,
--- kept for the period the law asks of hosting providers (ticket 26).
+-- kept for the period the law asks of hosting providers (issue #27).
 CREATE TABLE identifications (
     account BIGINT PRIMARY KEY REFERENCES library_accounts (id),
     email TEXT NOT NULL,

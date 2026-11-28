@@ -6,7 +6,7 @@
 ALTER TABLE library_accounts ALTER COLUMN subject DROP NOT NULL;
 ALTER TABLE library_accounts ADD COLUMN closed_at BIGINT;
 
--- When the account last shared an item (ticket 12 records it). The
+-- When the account last shared an item (issue #13 records it). The
 -- identification data of a closed account is kept for the legal period
--- after it (ticket 26), and erased at once if it never shared.
+-- after it (issue #27), and erased at once if it never shared.
 ALTER TABLE identifications ADD COLUMN last_shared_at BIGINT;

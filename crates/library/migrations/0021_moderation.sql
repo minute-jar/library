@@ -33,7 +33,7 @@ CREATE TABLE appeals (
 
 -- The decisions log: every moderator's decision, on a report or on an
 -- appeal, with its reasons. The transparency report counts it by reason and
--- outcome. `case_kind` is `report` (later also `held_review`, ticket 13);
+-- outcome. `case_kind` is `report` (later also `held_review`, issue #13);
 -- `appeal` names the appeal an `appeal` decision answers.
 CREATE TABLE moderation_decisions (
     id BIGSERIAL PRIMARY KEY,

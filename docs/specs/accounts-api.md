@@ -67,7 +67,7 @@ An account, as its owner sees it:
 - The items it shared stay published under their licence, with its pseudonym: their signed versions do not change.
 - Its pseudonym stays reserved: no account may take it again, without regard to case.
 - The library account is no longer joined to the Minute Jar account, whose next sign-in finds no account and may open another, under another pseudonym.
-- Its identification data, its identification and its verified card (`identification_cards`), is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, ticket 26) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Every share (`interface-v1.md`, Shares) records its instant in `identifications.last_shared_at`.
+- Its identification data, its identification and its verified card (`identification_cards`), is kept for the legal period after its last share, then erased by `Library::erase_identifications(now, kept_for)`, which `main.rs` calls every hour; `kept_for` is `IDENTIFICATION_RETENTION` (one year, issue #27) unless `LIBRARY_IDENTIFICATION_DAYS` sets it. An account that never shared has nothing to answer for: its identification data is erased at the next call. Every share (`interface-v1.md`, Shares) records its instant in `identifications.last_shared_at`.
 
 ## Card
 

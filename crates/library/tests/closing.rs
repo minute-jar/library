@@ -138,7 +138,7 @@ async fn items_stay_published_under_their_licence_with_the_pseudonym() {
 }
 
 /// Records a share by the account `pseudonym` at `when`, as sharing
-/// (ticket 12) will.
+/// (issue #13) will.
 async fn shared(database: &str, pseudonym: &str, when: jiff::Timestamp) {
     let pool = sqlx::PgPool::connect(database).await.unwrap();
     sqlx::query(

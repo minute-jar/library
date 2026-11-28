@@ -16,7 +16,7 @@ use super::{AccountError, Session, sqlx_time};
 use crate::Library;
 
 /// How long the identification data of a closed account is kept after its
-/// last share, by default: one year (ticket 26, to be confirmed by counsel).
+/// last share, by default: one year (issue #27, to be confirmed by counsel).
 pub const IDENTIFICATION_RETENTION: SignedDuration = SignedDuration::from_hours(365 * 24);
 
 pub fn router(library: Library) -> Router {
