@@ -17,6 +17,7 @@ pub enum Kind {
     Keys,
     Index,
     Item,
+    Withdrawals,
 }
 
 impl Kind {
@@ -25,6 +26,7 @@ impl Kind {
             Kind::Keys => "keys",
             Kind::Index => "index",
             Kind::Item => "item",
+            Kind::Withdrawals => "withdrawals",
         }
     }
 }

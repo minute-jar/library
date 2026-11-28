@@ -24,3 +24,33 @@ jobs:
       # The tests start a throwaway PostgreSQL through Docker (testcontainers).
       - name: Test
         run: cargo test
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      # The version in web/package.json (packageManager).
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Lint
+        run: pnpm run lint
+      - name: Typecheck
+        run: pnpm run check
+      - name: Unit tests
+        run: pnpm exec vitest --run
+      - name: Browser
+        run: pnpm exec playwright install --with-deps chromium
+      # Against a stand-in for the catalogue API (e2e/fake-api.ts).
+      - name: Smoke test
+        run: pnpm exec playwright test

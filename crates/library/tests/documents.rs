@@ -91,7 +91,7 @@ async fn the_index_lists_every_shared_item_at_its_latest_version() {
                         "curriculum": {"country": "GB", "year": "Year 5", "topic": "Verb forms"}
                     },
                     "selection": false,
-                    "signals": {"families": 0},
+                    "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                     "published_at": "2026-11-26T09:00:00Z"
                 },
                 {
@@ -109,8 +109,8 @@ async fn the_index_lists_every_shared_item_at_its_latest_version() {
                         "description": "Comparer et ranger des fractions simples.",
                         "curriculum": null
                     },
-                    "selection": false,
-                    "signals": {"families": 0},
+                    "selection": true,
+                    "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                     "published_at": "2026-11-21T08:00:00Z"
                 }
             ]
@@ -150,6 +150,11 @@ async fn an_unknown_item_and_an_unknown_version_answer_fixed_codes() {
     assert_eq!(
         (not_a_version.status.as_u16(), not_a_version.json()),
         (404, json!({"error": "unknown_version"}))
+    );
+    assert_eq!(
+        unknown_item.headers.get("cache-control").unwrap(),
+        "private, no-store",
+        "no cache keeps a refusal"
     );
 }
 

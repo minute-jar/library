@@ -23,12 +23,28 @@ A shared item made by changing another one, which keeps the original's attributi
 _Avoid_: Fork, remix, copy
 
 **Selection** (FR: Sélection):
-The mark on a shared item that the operator's team has read and chosen.
+The mark on a shared item that the operator's team has read and chosen; the editorial account's items carry it by right.
 _Avoid_: Featured, verified, staff pick, certified
 
 **Editorial Account** (FR: Compte éditorial):
 The library account under which the operator shares the content it makes itself, marked as the software's publisher.
 _Avoid_: Official author, Minute Jar team, admin account
+
+**Rating** (FR: Note):
+From 1 to 5 stars given to a shared item under a library identifier that imported it, one per identifier, the last one counting.
+_Avoid_: Score, vote, like
+
+**Short Review** (FR: Avis court):
+The few words a family may leave with its rating, held until the review publishes it; not to be confused with the review itself.
+_Avoid_: Comment (from a library account), testimonial, feedback
+
+**Suggestion** (FR: Suggestion):
+An answer to accept for a question of a shared item, sent under a library identifier that imported it; its author sees how many families suggested it, never which, and may accept it into a new version.
+_Avoid_: Correction, proposal, pull request, feedback
+
+**Comment** (FR: Commentaire):
+What a library account writes on a shared item's page under its pseudonym, shown once the review publishes it; addressed to the item, never to another account.
+_Avoid_: Message, reply, post, short review
 
 ### People
 
@@ -47,6 +63,10 @@ _Avoid_: Family ID, client ID, device ID, installation ID
 **Author** (FR: Auteur):
 A parent who has shared an item from their library account and answers for it.
 _Avoid_: Publisher, creator, contributor, uploader
+
+**Author Profile** (FR: Profil d'auteur):
+The page showing an author's shared items under their pseudonym of now and how many families use them, the same for everyone, to which the author alone sees the suggestions received added; items shared under an earlier pseudonym show only if the author chooses it.
+_Avoid_: Library account, user page, portfolio
 
 **Sharing Terms** (FR: Conditions de partage):
 What a parent accepts at their first share: they hold the rights, the content is compliant, they answer for it, and it is licensed CC BY-SA 4.0.
@@ -73,6 +93,18 @@ _Avoid_: Flag, complaint, ticket, abuse report
 **Switch-Off** (FR: Désactivation):
 The state of a shared item that no child of any family may use, until a moderator's decision, because a report of a child's personal data or illegal content was found plausible.
 _Avoid_: Takedown, ban, quarantine, block
+
+**Moderator** (FR: Modérateur):
+A member of the operator's team whom the operator named, who decides reports and appeals after signing in with a passkey.
+_Avoid_: Admin, reviewer, staff
+
+**Appeal** (FR: Recours):
+The request of an item's author or of a reporter, within six months of a moderator's decision, that another moderator decide again.
+_Avoid_: Complaint, dispute, contest
+
+**Decisions Log** (FR: Registre des décisions):
+Every moderator's decision with its reasons, from which the yearly transparency report counts decisions by reason and outcome.
+_Avoid_: Audit log, moderation log, history
 
 **Withdrawal** (FR: Retrait):
 The end of a shared item's presence in the catalogue, by its author's choice or by a moderation decision.
