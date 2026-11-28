@@ -57,6 +57,7 @@
 	"selection_title": "Selection",
 	"selection_none": "This shared item is not in the Selection.",
 	"selection_by": "In the Selection since {date}, chosen by {moderator}.",
+	"selection_editorial": "In the Selection since {date} by right: the editorial account shared it.",
 	"selection_add": "Add to the Selection",
 	"selection_remove": "Remove from the Selection",
 	"selection_added": "Added to the Selection. The index is signed again.",

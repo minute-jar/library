@@ -73,7 +73,7 @@ Comments have no timeline: an item's timeline holds only the reports of the item
 
 ## Timeline
 
-`GET /api/moderation/items/{item}` answers `{"item", "title", "timeline": [...], "selection"}`, the timeline oldest first, or `404` `unknown_item`. `selection` is `null`, or `{"moderator": "<handle>", "selected_at"}` for an item marked Selection. Each entry has `at` and `event`:
+`GET /api/moderation/items/{item}` answers `{"item", "title", "timeline": [...], "selection"}`, the timeline oldest first, or `404` `unknown_item`. `selection` is `null`, or `{"moderator": "<handle>", "selected_at"}` for an item marked Selection, `moderator` being `null` for an item of the editorial account, marked by right since its first publication (Selection). Each entry has `at` and `event`:
 
 - `reported`: `report`, `reason`, `details`, `effect`, `findings`, `notice`;
 - `corrected`: `report` (the author published a new version within 7 days);
@@ -96,7 +96,9 @@ Every decision enters the decisions log (table `moderation_decisions`, `case_kin
 
 The operator's team marks Selection the shared items it read and chose (ADR-0002): `PUT /api/moderation/items/{item}/selection` sets the mark, `DELETE` the same path removes it, both with no body, answering `204`. Setting it again, or removing a mark that is not there, changes nothing and answers `204` too. The item must be one the catalogue shows, neither withdrawn nor hidden from new imports, else `404` `unknown_item`; a withdrawn item keeps its mark and has it again if it comes back. `Library::select` and `Library::unselect` do the same.
 
-The library signs the index again at once: the item's entry has `selection` true (`interface-v1.md`, Index), as do its catalogue entry and item page (`catalogue-api.md`), and `GET /api/catalogue?selection=true` keeps only marked items. The mark is not a moderation decision: it does not enter the decisions log, and only who set it, and when, is kept. Items of the editorial account get it only by being chosen, like any other.
+The library signs the index again at once: the item's entry has `selection` true (`interface-v1.md`, Index), as do its catalogue entry and item page (`catalogue-api.md`), and `GET /api/catalogue?selection=true` keeps only marked items. The mark is not a moderation decision: it does not enter the decisions log, and only who set it, and when, is kept.
+
+Items of the editorial account carry the mark by right, from their first publication: the operator's own content is reviewed, then read by a person, and marked AI-generated and Selection (`library-service.md`, Editorial account and seeding; ADR-0002). The mark follows the version's `author.editorial`: removing it changes nothing for such an item. What team members share under their own library accounts gets the mark only by being chosen, like anyone's (ADR-0002).
 
 ## Transparency figures
 

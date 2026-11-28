@@ -36,7 +36,11 @@
 		{:else if form?.refused}
 			<p role="alert" class="text-destructive">{m.selection_refused({ code: form.refused })}</p>
 		{/if}
-		{#if data.timeline.selection}
+		{#if data.timeline.selection?.moderator === null}
+			<p class="text-sm">
+				{m.selection_editorial({ date: moment(data.timeline.selection.selected_at) })}
+			</p>
+		{:else if data.timeline.selection}
 			<p class="text-sm">
 				{m.selection_by({
 					date: moment(data.timeline.selection.selected_at),

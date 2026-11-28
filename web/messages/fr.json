@@ -57,6 +57,7 @@
 	"selection_title": "Sélection",
 	"selection_none": "Cet élément partagé n'est pas dans la Sélection.",
 	"selection_by": "Dans la Sélection depuis le {date}, choisi par {moderator}.",
+	"selection_editorial": "Dans la Sélection depuis le {date}, de droit : le compte éditorial l'a partagé.",
 	"selection_add": "Ajouter à la Sélection",
 	"selection_remove": "Retirer de la Sélection",
 	"selection_added": "Ajouté à la Sélection. L'index est signé de nouveau.",

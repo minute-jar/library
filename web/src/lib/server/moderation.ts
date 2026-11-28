@@ -144,8 +144,11 @@ export type TimelineEntry =
 			moderator: string;
 	  };
 
-/** Who marked an item Selection, and when. */
-export type Selection = { moderator: string; selected_at: string };
+/**
+ * Who marked an item Selection, and when; `moderator` is null for an
+ * editorial item, marked by right since its first publication.
+ */
+export type Selection = { moderator: string | null; selected_at: string };
 
 export type Timeline = {
 	item: string;

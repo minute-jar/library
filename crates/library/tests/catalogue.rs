@@ -68,7 +68,7 @@ async fn the_catalogue_lists_every_shared_item_at_its_latest_version_newest_firs
                     "description": "Comparer et ranger des fractions simples.",
                     "curriculum": null
                 },
-                "selection": false,
+                "selection": true,
                 "signals": {"families": 0, "ratings": [0, 0, 0, 0, 0]},
                 "published_at": "2026-11-21T08:00:00Z"
             }

@@ -89,7 +89,7 @@ A family server accepts another signed document only if its `key` is listed in a
 - One entry per shared item, at its latest published version that is not withdrawn, ordered by `item`. A withdrawn item leaves the index.
 - `type` is `bank` or `path`. `licence` is always `CC-BY-SA-4.0` (ADR-0001).
 - `author.editorial` is true for a version the operator's editorial account shared (ADR-0002): the software's publisher, not a parent. It is set at publication and never changes in a signed version.
-- `selection` is true for an item the operator's team marked Selection (read and chosen; `moderation-api.md`, Selection). The library signs the index again whenever the mark is set or removed.
+- `selection` is true for an item the operator's team marked Selection (read and chosen; `moderation-api.md`, Selection), and for every item of the editorial account (`author.editorial` true), which carries the mark by right. The library signs the index again whenever the mark is set or removed.
 - `derived_from` is `null` or `{"item", "version", "pseudonym"}` of the original.
 - `metadata.language` is a BCP 47 tag; `curriculum` may be `null`.
 - An index lives three days; the library issues a new one at least daily.

@@ -48,7 +48,7 @@ Each entry has the fields of an index entry (`interface-v1.md`, Index), its sign
 | `subject` | of that subject |
 | `age` | meant for that age, from 0 to 255: `ages.min <= age <= ages.max` |
 | `country`, `year`, `topic` | whose curriculum has that country, school year or topic |
-| `selection` | `true`: marked Selection by the operator's team (`moderation-api.md`, Selection); any other value is malformed |
+| `selection` | `true`: marked Selection by the operator's team, or shared by the editorial account (`moderation-api.md`, Selection); any other value is malformed |
 | `q` | whose title, description, subject or curriculum topic hold the words searched, in any inflected form, English or French (web search syntax: `"exact phrase"`, `or`, `-excluded`) |
 | `page` | the page asked for, from 1; a page past the last answers no items |
 

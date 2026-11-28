@@ -169,7 +169,7 @@ pub(crate) async fn sign_index(
                 (SELECT count(*) FROM imports WHERE imports.item = v.item),
                 ARRAY(SELECT (SELECT count(*) FROM ratings WHERE ratings.item = v.item AND ratings.stars = s)
                       FROM generate_series(1, 5) AS s ORDER BY s),
-                EXISTS (SELECT 1 FROM selections WHERE selections.item = v.item)
+                (v.author_editorial OR EXISTS (SELECT 1 FROM selections WHERE selections.item = v.item))
          FROM item_versions AS v
          WHERE NOT EXISTS (SELECT 1 FROM withdrawals AS w WHERE w.item = v.item AND w.version IN (0, v.version))
            AND NOT EXISTS (SELECT 1 FROM hidden_items AS h WHERE h.item = v.item)

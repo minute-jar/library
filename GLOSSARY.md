@@ -23,7 +23,7 @@ A shared item made by changing another one, which keeps the original's attributi
 _Avoid_: Fork, remix, copy
 
 **Selection** (FR: Sélection):
-The mark on a shared item that the operator's team has read and chosen.
+The mark on a shared item that the operator's team has read and chosen; the editorial account's items carry it by right.
 _Avoid_: Featured, verified, staff pick, certified
 
 **Editorial Account** (FR: Compte éditorial):
