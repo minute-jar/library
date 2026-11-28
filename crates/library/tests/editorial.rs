@@ -426,7 +426,7 @@ async fn only_an_item_the_catalogue_shows_is_marked_selection() {
 }
 
 #[tokio::test]
-async fn moderators_see_who_marked_an_item_selection_in_its_history() {
+async fn moderators_see_who_marked_an_item_selection_in_its_timeline() {
     let (sharing, moderator, item) = with_item().await;
     let path = format!("/api/moderation/items/{item}");
     let before = with_session(&sharing.library, "GET", &path, &moderator, None).await;

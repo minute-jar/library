@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { SESSION_COOKIE } from '#lib/server/accounts.ts';
 import { fakeAccounts, fakeCookies } from '#lib/server/testing/fake-accounts.ts';
-import { fakeModeration, verbsHistory } from '#lib/server/testing/fake-moderation.ts';
-import type { History } from '#lib/server/moderation.ts';
+import { fakeModeration, verbsTimeline } from '#lib/server/testing/fake-moderation.ts';
+import type { Timeline } from '#lib/server/moderation.ts';
 import { actions, load } from './+page.server.ts';
 
 type Event = Parameters<typeof load>[0];
@@ -38,13 +38,13 @@ async function mark(item: string, action: 'select' | 'unselect', moderator = tru
 	return { answer: actions[action](event), moderation: visited.moderation };
 }
 
-describe("an item's history in moderation", () => {
+describe("an item's timeline in moderation", () => {
 	it('shows its reports, decisions and appeals, oldest first', async () => {
-		const { load, moderation } = visit(verbsHistory.item);
+		const { load, moderation } = visit(verbsTimeline.item);
 
-		expect(await load).toEqual({ access: 'granted', history: verbsHistory });
+		expect(await load).toEqual({ access: 'granted', timeline: verbsTimeline });
 		expect(moderation.asked).toEqual([
-			{ method: 'GET', path: `/api/moderation/items/${verbsHistory.item}`, body: undefined }
+			{ method: 'GET', path: `/api/moderation/items/${verbsTimeline.item}`, body: undefined }
 		]);
 	});
 
@@ -55,47 +55,47 @@ describe("an item's history in moderation", () => {
 	});
 
 	it('refuses someone who is not a moderator', async () => {
-		expect(await visit(verbsHistory.item, false).load).toEqual({
+		expect(await visit(verbsTimeline.item, false).load).toEqual({
 			access: 'not_a_moderator',
-			history: null
+			timeline: null
 		});
 	});
 
 	it('says who marked the item Selection, and when', async () => {
-		const { load } = visit(verbsHistory.item);
+		const { load } = visit(verbsTimeline.item);
 
-		expect(((await load) as { history: History }).history.selection).toBeNull();
+		expect(((await load) as { timeline: Timeline }).timeline.selection).toBeNull();
 	});
 
 	it('marks the item Selection', async () => {
-		const { answer, moderation } = await mark(verbsHistory.item, 'select');
+		const { answer, moderation } = await mark(verbsTimeline.item, 'select');
 
 		expect(await answer).toEqual({ selection: 'selected' });
 		expect(moderation.asked).toEqual([
 			{
 				method: 'PUT',
-				path: `/api/moderation/items/${verbsHistory.item}/selection`,
+				path: `/api/moderation/items/${verbsTimeline.item}/selection`,
 				body: undefined
 			}
 		]);
-		expect(moderation.histories[verbsHistory.item].selection).toEqual({
+		expect(moderation.timelines[verbsTimeline.item].selection).toEqual({
 			moderator: 'Bruno',
 			selected_at: '2026-11-27T10:00:00Z'
 		});
 	});
 
 	it('removes the Selection mark', async () => {
-		const { answer, moderation } = await mark(verbsHistory.item, 'unselect');
+		const { answer, moderation } = await mark(verbsTimeline.item, 'unselect');
 
 		expect(await answer).toEqual({ selection: 'unselected' });
 		expect(moderation.asked[0]).toMatchObject({
 			method: 'DELETE',
-			path: `/api/moderation/items/${verbsHistory.item}/selection`
+			path: `/api/moderation/items/${verbsTimeline.item}/selection`
 		});
 	});
 
 	it('refuses the mark to someone who is not a moderator', async () => {
-		const { answer } = await mark(verbsHistory.item, 'select', false);
+		const { answer } = await mark(verbsTimeline.item, 'select', false);
 
 		expect(await answer).toMatchObject({ status: 403, data: { refused: 'not_a_moderator' } });
 	});

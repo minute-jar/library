@@ -106,7 +106,7 @@ export type CommentReportCase = {
 /** What waits in the one queue. */
 export type Case = ReportCase | AppealCase | HeldReviewCase | HeldCommentCase | CommentReportCase;
 
-export type HistoryEntry =
+export type TimelineEntry =
 	| {
 			at: string;
 			event: 'reported';
@@ -148,10 +148,10 @@ export type HistoryEntry =
 /** Who marked an item Selection, and when. */
 export type Selection = { moderator: string; selected_at: string };
 
-export type History = {
+export type Timeline = {
 	item: string;
 	title: string;
-	history: HistoryEntry[];
+	timeline: TimelineEntry[];
 	/** Null when the item is not marked Selection. */
 	selection: Selection | null;
 };
@@ -202,8 +202,8 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 		async queue(session: string) {
 			return (await call<{ cases: Case[] }>('GET', '/api/moderation/queue', session)).cases;
 		},
-		history(session: string, item: string) {
-			return call<History>('GET', `/api/moderation/items/${encodeURIComponent(item)}`, session);
+		timeline(session: string, item: string) {
+			return call<Timeline>('GET', `/api/moderation/items/${encodeURIComponent(item)}`, session);
 		},
 		decideReport(session: string, report: string, outcome: Outcome, reasons: string) {
 			return call<void>(

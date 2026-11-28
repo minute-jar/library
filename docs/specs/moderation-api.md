@@ -5,7 +5,7 @@ status: draft
 
 # Moderation API
 
-The JSON API behind the website's administration pages for moderators (stories S22 and S26): one queue of what waits for a decision, the history of each item, decisions with reasons, appeals, and the decisions log read as the yearly transparency report's figures. Like the accounts API (`accounts-api.md`), it is the service's own API, read by its website's server, and may change with it. Code: `crates/library/src/moderation/`. The appeals of reporters, which family servers send too, are part of the interface (`interface-v1.md`, Appeals).
+The JSON API behind the website's administration pages for moderators (stories S22 and S26): one queue of what waits for a decision, the timeline of each item, decisions with reasons, appeals, and the decisions log read as the yearly transparency report's figures. Like the accounts API (`accounts-api.md`), it is the service's own API, read by its website's server, and may change with it. Code: `crates/library/src/moderation/`. The appeals of reporters, which family servers send too, are part of the interface (`interface-v1.md`, Appeals).
 
 ## Moderators
 
@@ -50,7 +50,7 @@ A share the review held (`interface-v1.md`, Shares), not yet published, with the
  "received_at": "2026-11-27T10:00:00Z", "due_at": "2026-11-29T10:00:00Z"}
 ```
 
-`pseudonym` is the author's pseudonym now, under which a publication would go. A held share has no history: its item is not in the catalogue yet.
+`pseudonym` is the author's pseudonym now, under which a publication would go. A held share has no timeline: its item is not in the catalogue yet.
 
 A comment the review held (`catalogue-api.md`, Comments), with the item it is on:
 
@@ -69,11 +69,11 @@ A report of a published comment (`catalogue-api.md`, Reports of comments); `hidd
  "received_at": "2026-11-27T10:00:00Z", "due_at": "2026-11-29T10:00:00Z"}
 ```
 
-Comments have no history: an item's history holds only the reports of the item.
+Comments have no timeline: an item's timeline holds only the reports of the item.
 
-## History
+## Timeline
 
-`GET /api/moderation/items/{item}` answers `{"item", "title", "history": [...], "selection"}`, the history oldest first, or `404` `unknown_item`. `selection` is `null`, or `{"moderator": "<handle>", "selected_at"}` for an item marked Selection. Each entry has `at` and `event`:
+`GET /api/moderation/items/{item}` answers `{"item", "title", "timeline": [...], "selection"}`, the timeline oldest first, or `404` `unknown_item`. `selection` is `null`, or `{"moderator": "<handle>", "selected_at"}` for an item marked Selection. Each entry has `at` and `event`:
 
 - `reported`: `report`, `reason`, `details`, `effect`, `findings`, `notice`;
 - `corrected`: `report` (the author published a new version within 7 days);

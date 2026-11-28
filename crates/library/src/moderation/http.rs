@@ -18,7 +18,7 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 use super::{
-    Appeal, AppealDecision, AppealError, AppealOutcome, Appellant, Case, Event, HistoryEntry,
+    Appeal, AppealDecision, AppealError, AppealOutcome, Appellant, Case, Event, TimelineEntry,
 };
 use crate::Library;
 use crate::accounts::http::{Refusal, signed_in};
@@ -29,7 +29,7 @@ use crate::shares::held::{HeldDecision, HeldDecisionError, HeldOutcome};
 pub fn router(library: Library) -> Router {
     Router::new()
         .route("/api/moderation/queue", get(queue))
-        .route("/api/moderation/items/{item}", get(history))
+        .route("/api/moderation/items/{item}", get(timeline))
         .route(
             "/api/moderation/reports/{report}/decision",
             post(decide_report),
@@ -146,7 +146,7 @@ fn notice_json(notice: &Option<crate::FormalNotice>) -> Value {
     )
 }
 
-fn entry_json(entry: &HistoryEntry) -> Value {
+fn entry_json(entry: &TimelineEntry) -> Value {
     let at = time(entry.at);
     match &entry.event {
         Event::Reported {
@@ -194,24 +194,24 @@ fn entry_json(entry: &HistoryEntry) -> Value {
     }
 }
 
-async fn history(
+async fn timeline(
     State(library): State<Library>,
     Path(item): Path<String>,
     headers: HeaderMap,
 ) -> Answer {
     moderator(&library, &headers).await?;
-    let history = library
-        .moderation_history(&item)
+    let timeline = library
+        .moderation_timeline(&item)
         .await
         .map_err(unavailable)?
         .ok_or_else(|| refused(StatusCode::NOT_FOUND, "unknown_item"))?;
-    let entries: Vec<Value> = history.entries.iter().map(entry_json).collect();
+    let entries: Vec<Value> = timeline.entries.iter().map(entry_json).collect();
     let selection = crate::editorial::selection::of_item(&library.pool, &item)
         .await
         .map_err(unavailable)?;
     Ok(answer(
         StatusCode::OK,
-        json!({"item": history.item, "title": history.title, "history": entries, "selection": selection}),
+        json!({"item": timeline.item, "title": timeline.title, "timeline": entries, "selection": selection}),
     ))
 }
 

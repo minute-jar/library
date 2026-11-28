@@ -362,12 +362,12 @@ async fn a_report_of_a_comment_names_a_reason_and_a_published_comment() {
 }
 
 #[tokio::test]
-async fn the_history_of_an_item_leaves_out_its_comments() {
+async fn the_timeline_of_an_item_leaves_out_its_comments() {
     let (commenting, lark, alice) = moderated().await;
     let comment = published(&commenting, &lark).await;
     report(&commenting, &comment, json!({"reason": "other"})).await;
 
-    let history = ask(
+    let timeline = ask(
         &commenting,
         &format!("/api/moderation/items/{VERBS}"),
         &alice,
@@ -375,5 +375,5 @@ async fn the_history_of_an_item_leaves_out_its_comments() {
     )
     .await;
 
-    assert_eq!(history.json()["history"], json!([]));
+    assert_eq!(timeline.json()["timeline"], json!([]));
 }

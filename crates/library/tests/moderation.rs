@@ -351,7 +351,7 @@ async fn a_decision_needs_reasons_and_is_made_once() {
 }
 
 #[tokio::test]
-async fn the_history_of_an_item_shows_its_reports_and_decisions_oldest_first() {
+async fn the_timeline_of_an_item_shows_its_reports_and_decisions_oldest_first() {
     let desk = desk().await;
     let first = desk.report(VERBS, "other").await;
     desk.clock.advance(SignedDuration::from_mins(1));
@@ -383,7 +383,7 @@ async fn the_history_of_an_item_shows_its_reports_and_decisions_oldest_first() {
         json!({
             "item": VERBS,
             "title": "Irregular verbs",
-            "history": [
+            "timeline": [
                 {"at": "2026-11-27T10:00:00Z", "event": "reported", "report": first,
                  "reason": "other", "details": "Question 1", "effect": "none", "findings": null, "notice": null},
                 {"at": "2026-11-27T10:01:00Z", "event": "decided", "report": first,
@@ -518,7 +518,7 @@ async fn the_reporter_appeals_a_rejection_and_another_moderator_reverses_it() {
     );
     let told = desk.library.author_notifications(VERBS).await.unwrap();
     assert_eq!(told.last().unwrap().appeal, Some(decision));
-    let history = desk
+    let timeline = desk
         .ask(
             "GET",
             &format!("/api/moderation/items/{VERBS}"),
@@ -527,7 +527,7 @@ async fn the_reporter_appeals_a_rejection_and_another_moderator_reverses_it() {
         )
         .await
         .json();
-    let events: Vec<&str> = history["history"]
+    let events: Vec<&str> = timeline["timeline"]
         .as_array()
         .unwrap()
         .iter()
@@ -538,12 +538,12 @@ async fn the_reporter_appeals_a_rejection_and_another_moderator_reverses_it() {
         ["reported", "decided", "appealed", "appeal_decided"]
     );
     assert_eq!(
-        history["history"][2],
+        timeline["timeline"][2],
         json!({"at": "2026-11-27T10:01:00Z", "event": "appealed", "appeal": appeal, "report": report,
                "appellant": "reporter", "statement": "Page 12 of English Grammar, Year 5."})
     );
     assert_eq!(
-        history["history"][3],
+        timeline["timeline"][3],
         json!({"at": "2026-11-27T10:01:00Z", "event": "appeal_decided", "appeal": appeal, "report": report,
                "outcome": "reversed", "reasons": "Page 12 matches.", "moderator": "Bruno"})
     );

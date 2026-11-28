@@ -202,7 +202,7 @@
 									href={href(`/moderation/items/${waiting.item}`)}
 									class="underline underline-offset-4"
 								>
-									{m.moderation_history_link()}
+									{m.moderation_timeline_link()}
 								</a>
 							</p>
 						{/if}

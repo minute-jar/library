@@ -154,7 +154,7 @@ Blocked by 2 and 16. Stories S20, S21, S23, S24, S25.
 
 Blocked by 7, 9 and 19. Stories S22, S26.
 
-- Administration pages for moderators (role given by the operator, passkey sign-in): one queue with review findings, reports and history; decisions with reasons to author and reporter; appeal; the decisions log for the yearly transparency report.
+- Administration pages for moderators (role given by the operator, passkey sign-in): one queue with review findings, reports and timeline; decisions with reasons to author and reporter; appeal; the decisions log for the yearly transparency report.
 
 ## Comments and profiles
 

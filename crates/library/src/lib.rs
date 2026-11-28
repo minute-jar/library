@@ -57,8 +57,8 @@ pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
 pub use crate::moderation::{
     APPEAL_PERIOD, Appeal, AppealDecision, AppealError, AppealOutcome, AppealState, AppealStatus,
-    Appellant, Case, DECISION_TARGET, Event, Figures, History, HistoryEntry, ModeratorError,
-    QueuedAppeal, STATEMENT_LIMIT,
+    Appellant, Case, DECISION_TARGET, Event, Figures, ModeratorError, QueuedAppeal,
+    STATEMENT_LIMIT, Timeline, TimelineEntry,
 };
 pub use crate::ratings::{ItemRatings, REVIEW_LENGTH, RatingError, Review};
 pub use crate::reports::{
@@ -596,9 +596,9 @@ impl Library {
         moderation::figures(&self.pool, year).await
     }
 
-    /// The history of `item` in moderation, oldest first, if it exists.
-    pub async fn moderation_history(&self, item: &str) -> Result<Option<History>, sqlx::Error> {
-        moderation::history(&self.pool, item).await
+    /// The timeline of `item` in moderation, oldest first, if it exists.
+    pub async fn moderation_timeline(&self, item: &str) -> Result<Option<Timeline>, sqlx::Error> {
+        moderation::timeline(&self.pool, item).await
     }
 
     /// Records at `now` the decision of the moderator `moderator` on a share

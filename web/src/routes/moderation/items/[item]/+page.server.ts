@@ -1,22 +1,22 @@
-// An item's history in moderation: its reports, the decisions on them and
+// An item's timeline in moderation: its reports, the decisions on them and
 // their appeals, oldest first, so that a moderator decides consistently;
 // and its Selection mark, which a moderator sets or removes here.
 
 import { error, fail } from '@sveltejs/kit';
 import { Refused, SESSION_COOKIE } from '#lib/server/accounts.ts';
 import { Unavailable } from '#lib/server/catalogue.ts';
-import { type History, access, moderation } from '#lib/server/moderation.ts';
+import { type Timeline, access, moderation } from '#lib/server/moderation.ts';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load = (async ({ params, fetch, cookies }) => {
 	const session = cookies.get(SESSION_COOKIE);
-	if (!session) return { access: 'signed_out', history: null as History | null };
+	if (!session) return { access: 'signed_out', timeline: null as Timeline | null };
 	try {
-		const history = await moderation(fetch).history(session, params.item);
-		return { access: 'granted', history };
+		const timeline = await moderation(fetch).timeline(session, params.item);
+		return { access: 'granted', timeline };
 	} catch (failure) {
 		const refused = access(failure);
-		if (refused) return { access: refused, history: null as History | null };
+		if (refused) return { access: refused, timeline: null as Timeline | null };
 		if (failure instanceof Refused && failure.code === 'unknown_item') error(404, 'Unknown item');
 		error(503, 'Moderation is unavailable');
 	}

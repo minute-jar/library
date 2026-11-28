@@ -70,7 +70,7 @@ Words such as "random identifier" or "noised totals" appear only behind "Learn m
 23. As a parent, I want an item reported for a child's personal data or illegal content switched off in every family within the hour if the report holds up, so that harm stops.
 24. As an author, I want an item switched off wrongly to come back by itself when a moderator rejects the report, so that one malicious report costs nothing lasting.
 25. As a rights holder, I want a formal notice form, so that protected content is hidden at once.
-26. As a moderator, I want one queue with the AI review's findings, the reports and their history, so that I decide quickly and consistently.
+26. As a moderator, I want one queue with the AI review's findings, the reports and their timeline, so that I decide quickly and consistently.
 
 ### Ratings and comments
 

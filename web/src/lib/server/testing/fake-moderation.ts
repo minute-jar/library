@@ -10,7 +10,7 @@ import type {
 	Figures,
 	HeldCommentCase,
 	HeldReviewCase,
-	History,
+	Timeline,
 	ReportCase
 } from '../moderation.ts';
 
@@ -89,10 +89,10 @@ export const reportedComment: CommentReportCase = {
 	due_at: '2026-11-28T16:00:00Z'
 };
 
-export const verbsHistory: History = {
+export const verbsTimeline: Timeline = {
 	item: rightsReport.item,
 	title: 'Irregular verbs, part 1',
-	history: [
+	timeline: [
 		{
 			at: '2026-11-26T10:00:00Z',
 			event: 'reported',
@@ -130,8 +130,8 @@ export type FakeModeration = {
 	passkey: boolean;
 	/** What waits in the queue. */
 	cases: Case[];
-	/** The histories, by item. */
-	histories: Record<string, History>;
+	/** The timelines, by item. */
+	timelines: Record<string, Timeline>;
 	/** The figures, by year. */
 	figures: Record<number, Figures>;
 };
@@ -156,18 +156,18 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 		if (path === '/api/moderation/queue') return json({ cases: fake.cases });
 		const marked = path.match(/^\/api\/moderation\/items\/([^/]+)\/selection$/);
 		if (marked && (request.method === 'PUT' || request.method === 'DELETE')) {
-			const history = fake.histories[marked[1]];
-			if (!history) return refused(404, 'unknown_item');
-			history.selection =
+			const timeline = fake.timelines[marked[1]];
+			if (!timeline) return refused(404, 'unknown_item');
+			timeline.selection =
 				request.method === 'PUT'
-					? (history.selection ?? { moderator: handle, selected_at: '2026-11-27T10:00:00Z' })
+					? (timeline.selection ?? { moderator: handle, selected_at: '2026-11-27T10:00:00Z' })
 					: null;
 			return new Response(null, { status: 204 });
 		}
 		const item = path.match(/^\/api\/moderation\/items\/([^/]+)$/);
 		if (item) {
-			const history = fake.histories[item[1]];
-			return history ? json(history) : refused(404, 'unknown_item');
+			const timeline = fake.timelines[item[1]];
+			return timeline ? json(timeline) : refused(404, 'unknown_item');
 		}
 		const year = path.match(/^\/api\/moderation\/figures\/([^/]+)$/);
 		if (year) {
@@ -221,7 +221,7 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 				fake.cases.splice(index, 0, done);
 				return refused(403, 'same_moderator');
 			}
-			fake.histories[done.item]?.history.push(
+			fake.timelines[done.item]?.timeline.push(
 				done.kind === 'report'
 					? {
 							at: '2026-11-27T10:00:00Z',
@@ -253,7 +253,7 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 		anyoneModerates: false,
 		passkey: true,
 		cases: [structuredClone(rightsReport), structuredClone(authorAppeal)],
-		histories: { [verbsHistory.item]: structuredClone(verbsHistory) },
+		timelines: { [verbsTimeline.item]: structuredClone(verbsTimeline) },
 		figures: { 2026: figures2026 },
 		fetch(request) {
 			const { pathname } = new URL(request.url);

@@ -19,7 +19,7 @@
 </svelte:head>
 
 <p class="mb-4 text-sm">
-	<a href={href('/moderation')} class="underline-offset-4 hover:underline">{m.history_back()}</a>
+	<a href={href('/moderation')} class="underline-offset-4 hover:underline">{m.moderation_back()}</a>
 </p>
 <h1 class="mb-2 text-2xl font-semibold">{m.figures_title({ year: data.year })}</h1>
 
