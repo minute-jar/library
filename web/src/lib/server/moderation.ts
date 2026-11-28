@@ -159,7 +159,20 @@ export type Timeline = {
 export type Figures = {
 	year: number;
 	reports: { reason: Reason; received: number }[];
-	decisions: { reason: Reason; outcome: Outcome; count: number }[];
+	/** Decisions on reports of items and comments. */
+	decisions: {
+		case: 'report' | 'comment_report';
+		reason: Reason;
+		outcome: Outcome;
+		count: number;
+	}[];
+	/** Decisions on what the review held, apart from reports. */
+	reviews: {
+		case: 'held_review' | 'held_comment';
+		reason: Reason;
+		outcome: 'published' | 'refused';
+		count: number;
+	}[];
 	appeals: { appellant: Appellant; outcome: AppealOutcome | 'waiting'; count: number }[];
 };
 

@@ -131,7 +131,12 @@ async fn a_moderator_publishes_a_held_comment() {
     let figures = ask(&commenting, "/api/moderation/figures/2026", &alice, None).await;
     assert_eq!(
         figures.json()["decisions"],
-        json!([{"reason": "personal_data", "outcome": "rejected", "count": 1}])
+        json!([]),
+        "no report was decided"
+    );
+    assert_eq!(
+        figures.json()["reviews"],
+        json!([{"case": "held_comment", "reason": "personal_data", "outcome": "published", "count": 1}])
     );
 }
 
@@ -310,7 +315,7 @@ async fn a_moderator_who_upholds_a_report_of_a_comment_removes_it() {
     let figures = ask(&commenting, "/api/moderation/figures/2026", &alice, None).await;
     assert_eq!(
         figures.json()["decisions"],
-        json!([{"reason": "other", "outcome": "upheld", "count": 1}])
+        json!([{"case": "comment_report", "reason": "other", "outcome": "upheld", "count": 1}])
     );
     let decided_again = ask(
         &commenting,

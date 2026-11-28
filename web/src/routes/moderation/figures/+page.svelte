@@ -6,7 +6,7 @@
 	import { Button } from '#lib/components/ui/button/index.js';
 	import { Input } from '#lib/components/ui/input/index.js';
 	import ModerationAccess from '#lib/components/moderation-access.svelte';
-	import { appellantWord, outcomeWord, reasonWord } from '#lib/moderation-words.ts';
+	import { appellantWord, caseWord, outcomeWord, reasonWord } from '#lib/moderation-words.ts';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -68,14 +68,44 @@
 			<table class="text-sm">
 				<thead>
 					<tr>
+						<th class="pr-6 text-left">{m.figures_case()}</th>
 						<th class="pr-6 text-left">{m.figures_reason()}</th>
 						<th class="pr-6 text-left">{m.figures_outcome()}</th>
 						<th class="text-right">{m.figures_count()}</th>
 					</tr>
 				</thead>
 				<tbody>
-					{#each figures.decisions as row (`${row.reason}/${row.outcome}`)}
+					{#each figures.decisions as row (`${row.case}/${row.reason}/${row.outcome}`)}
 						<tr>
+							<td class="pr-6">{caseWord(row.case)}</td>
+							<td class="pr-6">{reasonWord(row.reason)}</td>
+							<td class="pr-6">{outcomeWord(row.outcome)}</td>
+							<td class="text-right tabular-nums">{row.count}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{/if}
+	</section>
+
+	<section class="mb-6">
+		<h2 class="mb-2 text-lg font-semibold">{m.figures_reviews()}</h2>
+		{#if figures.reviews.length === 0}
+			<p>{m.figures_none()}</p>
+		{:else}
+			<table class="text-sm">
+				<thead>
+					<tr>
+						<th class="pr-6 text-left">{m.figures_case()}</th>
+						<th class="pr-6 text-left">{m.figures_reason()}</th>
+						<th class="pr-6 text-left">{m.figures_outcome()}</th>
+						<th class="text-right">{m.figures_count()}</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each figures.reviews as row (`${row.case}/${row.reason}/${row.outcome}`)}
+						<tr>
+							<td class="pr-6">{caseWord(row.case)}</td>
 							<td class="pr-6">{reasonWord(row.reason)}</td>
 							<td class="pr-6">{outcomeWord(row.outcome)}</td>
 							<td class="text-right tabular-nums">{row.count}</td>

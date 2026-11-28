@@ -19,7 +19,16 @@ const outcomes: Record<string, () => string> = {
 	rejected: m.word_rejected,
 	maintained: m.word_maintained,
 	reversed: m.word_reversed,
+	published: m.word_published,
+	refused: m.word_refused,
 	waiting: m.word_waiting
+};
+
+const cases: Record<string, () => string> = {
+	report: m.figures_case_report,
+	comment_report: m.figures_case_comment_report,
+	held_review: m.figures_case_held_review,
+	held_comment: m.figures_case_held_comment
 };
 
 const appellants: Record<string, () => string> = {
@@ -39,6 +48,7 @@ const refusals: Record<string, () => string> = {
 
 export const reasonWord = (code: string) => (reasons[code] ?? m.reason_other)();
 export const outcomeWord = (code: string) => (outcomes[code] ?? (() => code))();
+export const caseWord = (code: string) => (cases[code] ?? (() => code))();
 export const appellantWord = (code: string) => (appellants[code] ?? (() => code))();
 export const refusalWord = (code: string) => (refusals[code] ?? m.refused_other)();
 

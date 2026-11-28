@@ -58,7 +58,7 @@ pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
 pub use crate::moderation::{
     APPEAL_PERIOD, Appeal, AppealDecision, AppealError, AppealOutcome, AppealState, AppealStatus,
-    Appellant, Case, DECISION_TARGET, Event, Figures, ModeratorError, QueuedAppeal,
+    Appellant, Case, CaseKind, DECISION_TARGET, Event, Figures, ModeratorError, QueuedAppeal,
     STATEMENT_LIMIT, Timeline, TimelineEntry,
 };
 pub use crate::ratings::{ItemRatings, REVIEW_LENGTH, RatingError, Review};

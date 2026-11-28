@@ -7,8 +7,8 @@ mod appeals;
 mod figures;
 pub(crate) mod http;
 
-pub use figures::Figures;
 pub(crate) use figures::of_year as figures;
+pub use figures::{CaseKind, Figures};
 
 pub use appeals::{
     APPEAL_PERIOD, Appeal, AppealDecision, AppealError, AppealOutcome, AppealState, AppealStatus,

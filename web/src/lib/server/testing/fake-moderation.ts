@@ -113,7 +113,8 @@ export const figures2026: Figures = {
 		{ reason: 'other', received: 2 },
 		{ reason: 'rights', received: 1 }
 	],
-	decisions: [{ reason: 'rights', outcome: 'upheld', count: 1 }],
+	decisions: [{ case: 'report', reason: 'rights', outcome: 'upheld', count: 1 }],
+	reviews: [{ case: 'held_review', reason: 'personal_data', outcome: 'refused', count: 1 }],
 	appeals: [{ appellant: 'author', outcome: 'reversed', count: 1 }]
 };
 

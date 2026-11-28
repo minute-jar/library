@@ -538,8 +538,15 @@ async fn figures(
     let decisions: Vec<Value> = figures
         .decisions
         .iter()
-        .map(|(reason, outcome, count)| {
-            json!({"reason": reason.code(), "outcome": outcome.code(), "count": count})
+        .map(|(case, reason, outcome, count)| {
+            json!({"case": case.code(), "reason": reason.code(), "outcome": outcome.code(), "count": count})
+        })
+        .collect();
+    let reviews: Vec<Value> = figures
+        .reviews
+        .iter()
+        .map(|(case, reason, outcome, count)| {
+            json!({"case": case.code(), "reason": reason.code(), "outcome": outcome.code(), "count": count})
         })
         .collect();
     let appeals: Vec<Value> = figures
@@ -551,6 +558,6 @@ async fn figures(
         .collect();
     Ok(answer(
         StatusCode::OK,
-        json!({"year": figures.year, "reports": reports, "decisions": decisions, "appeals": appeals}),
+        json!({"year": figures.year, "reports": reports, "decisions": decisions, "reviews": reviews, "appeals": appeals}),
     ))
 }

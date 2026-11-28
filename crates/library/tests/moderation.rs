@@ -830,9 +830,10 @@ async fn the_decisions_log_gives_the_yearly_transparency_figures_without_persona
                 {"reason": "wrong_answer", "received": 1},
             ],
             "decisions": [
-                {"reason": "other", "outcome": "rejected", "count": 2},
-                {"reason": "rights", "outcome": "upheld", "count": 1},
+                {"case": "report", "reason": "other", "outcome": "rejected", "count": 2},
+                {"case": "report", "reason": "rights", "outcome": "upheld", "count": 1},
             ],
+            "reviews": [],
             "appeals": [
                 {"appellant": "author", "outcome": "reversed", "count": 1},
                 {"appellant": "reporter", "outcome": "maintained", "count": 1},
