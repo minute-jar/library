@@ -776,3 +776,80 @@ async fn a_library_opened_without_a_review_provider_refuses_reports() {
     assert_eq!(answer.status, StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(answer.json(), json!({"error": "unavailable"}));
 }
+
+/// A library with accounts, cards and reports whose review finds nothing,
+/// the verbs bank published.
+async fn with_accounts_and_reports() -> common::shares::Sharing {
+    let sharing = common::shares::with_sharing().await;
+    sharing
+        .library
+        .publish_version(verbs("Irregular verbs"), at("2026-11-20T18:00:00Z"))
+        .await
+        .unwrap();
+    sharing
+}
+
+/// Reports the verbs bank for `reason` from the website, with `session`.
+async fn report_signed_in(library: &Library, session: &str, reason: &str) -> Answer {
+    common::identity::with_session(
+        library,
+        "POST",
+        "/api/reports",
+        session,
+        Some(json!({"item": VERBS, "reason": reason})),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn a_verified_library_accounts_report_of_personal_data_switches_the_item_off_at_once() {
+    let sharing = with_accounts_and_reports().await;
+    let session = sharing.author("reporting-parent-subject", "Lark").await;
+
+    let id = report_id(&report_signed_in(&sharing.library, &session, "personal_data").await);
+
+    let withdrawals = fetch_verified(&sharing.library, "/v1/withdrawals", Kind::Withdrawals).await;
+    assert_eq!(
+        listed(&withdrawals),
+        vec![(
+            VERBS.to_string(),
+            "switch_off".into(),
+            "personal_data".into()
+        )],
+        "switched off although the review finds nothing"
+    );
+    let queue = sharing.library.moderation_queue().await.unwrap();
+    assert_eq!(queue[0].report, id);
+    assert_eq!(queue[0].effect, library::Effect::SwitchedOff);
+}
+
+#[tokio::test]
+async fn an_account_without_a_verified_card_reports_like_anyone() {
+    let sharing = with_accounts_and_reports().await;
+    let session = common::cards::account(
+        &sharing.library,
+        &sharing.provider,
+        &sharing.clock,
+        "reporting-parent-subject",
+        "Lark",
+        "separate",
+    )
+    .await;
+
+    report_id(&report_signed_in(&sharing.library, &session, "personal_data").await);
+
+    let withdrawals = fetch_verified(&sharing.library, "/v1/withdrawals", Kind::Withdrawals).await;
+    assert!(listed(&withdrawals).is_empty(), "hidden, not switched off");
+    let index = fetch_verified(&sharing.library, "/v1/index", Kind::Index).await;
+    assert!(!in_index(&index, VERBS));
+}
+
+#[tokio::test]
+async fn a_report_with_a_session_that_is_no_longer_valid_is_received_anonymously() {
+    let sharing = with_accounts_and_reports().await;
+
+    report_id(&report_signed_in(&sharing.library, "no-such-session", "personal_data").await);
+
+    let withdrawals = fetch_verified(&sharing.library, "/v1/withdrawals", Kind::Withdrawals).await;
+    assert!(listed(&withdrawals).is_empty());
+}

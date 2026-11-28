@@ -60,6 +60,14 @@ pub enum Reporter {
         /// A rights holder's formal notice; it needs `contact`.
         notice: Option<FormalNotice>,
     },
+    /// Someone on the website signed in with a library account whose card
+    /// is verified: their report of a child's personal data, sexual or
+    /// illegal content switches the item off at once. The report keeps no
+    /// link to the account.
+    VerifiedAccount {
+        contact: Option<String>,
+        notice: Option<FormalNotice>,
+    },
 }
 
 /// A rights holder's formal notice, with their identity.
@@ -329,7 +337,7 @@ fn check(report: &NewReport) -> Result<(), ReportError> {
                 return Err(ReportError::BadIdentifier);
             }
         }
-        Reporter::Website { contact, notice } => {
+        Reporter::Website { contact, notice } | Reporter::VerifiedAccount { contact, notice } => {
             if contact
                 .as_deref()
                 .is_some_and(|contact| !is_contact(contact))
@@ -431,6 +439,12 @@ async fn urgent_effect(
     if withdrawn_whole(pool, &report.item).await? {
         return Ok((Effect::None, None));
     }
+    if let Reporter::VerifiedAccount { .. } = report.reporter {
+        return Ok((
+            Effect::SwitchedOff,
+            Some("reported by a verified library account".into()),
+        ));
+    }
     if families(pool, &report.item, &URGENT, identifier).await? >= URGENT_FAMILIES {
         return Ok((
             Effect::SwitchedOff,
@@ -496,10 +510,12 @@ pub async fn receive(
     let latest = latest.ok_or(ReportError::UnknownItem)?;
     let identifier = match &report.reporter {
         Reporter::Family { library_identifier } => Some(library_identifier.as_str()),
-        Reporter::Website { .. } => None,
+        Reporter::Website { .. } | Reporter::VerifiedAccount { .. } => None,
     };
     let (contact, notice) = match &report.reporter {
-        Reporter::Website { contact, notice } => (contact.clone(), notice.clone()),
+        Reporter::Website { contact, notice } | Reporter::VerifiedAccount { contact, notice } => {
+            (contact.clone(), notice.clone())
+        }
         Reporter::Family { .. } => (None, None),
     };
 
