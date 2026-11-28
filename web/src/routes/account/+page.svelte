@@ -92,6 +92,25 @@
 				</label>
 				<Button type="submit" variant="outline">{m.rename_submit()}</Button>
 			</form>
+			{#if form && 'earlier' in form}
+				<p role="status" class="text-sm">{m.earlier_saved()}</p>
+			{/if}
+			<form method="post" action="?/earlier" class="grid gap-2">
+				<label class="flex gap-3 text-sm">
+					<input
+						type="checkbox"
+						name="show_earlier_pseudonyms"
+						checked={data.account.show_earlier_pseudonyms}
+					/>
+					<span class="grid gap-1">
+						<span>{m.earlier_label()}</span>
+						<span class="text-muted-foreground">{m.earlier_hint()}</span>
+					</span>
+				</label>
+				<div>
+					<Button type="submit" variant="outline">{m.earlier_submit()}</Button>
+				</div>
+			</form>
 		</Card.Content>
 	</Card.Root>
 

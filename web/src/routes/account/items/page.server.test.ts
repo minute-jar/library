@@ -11,7 +11,8 @@ type WithdrawEvent = Parameters<typeof actions.withdraw>[0];
 const owl = {
 	pseudonym: 'Owl',
 	minute_jar_account: 'separate' as const,
-	opened_at: '2026-11-27T10:00:00Z'
+	opened_at: '2026-11-27T10:00:00Z',
+	show_earlier_pseudonyms: false
 };
 
 const verbs: AuthoredItem = {

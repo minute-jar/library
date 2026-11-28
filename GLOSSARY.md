@@ -65,7 +65,7 @@ A parent who has shared an item from their library account and answers for it.
 _Avoid_: Publisher, creator, contributor, uploader
 
 **Author Profile** (FR: Profil d'auteur):
-The page showing an author's shared items under their pseudonym of now and how many families use them, the same for everyone, to which the author alone sees the suggestions received added.
+The page showing an author's shared items under their pseudonym of now and how many families use them, the same for everyone, to which the author alone sees the suggestions received added; items shared under an earlier pseudonym show only if the author chooses it.
 _Avoid_: Library account, user page, portfolio
 
 **Sharing Terms** (FR: Conditions de partage):

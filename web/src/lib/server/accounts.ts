@@ -26,6 +26,8 @@ export type Account = {
 	pseudonym: string;
 	minute_jar_account: MinuteJarAccount;
 	opened_at: string;
+	/** Whether the public profile shows the items shared under earlier pseudonyms. */
+	show_earlier_pseudonyms: boolean;
 };
 
 /** What the API knows of a session. */
@@ -74,6 +76,13 @@ export function accounts(fetch: typeof globalThis.fetch, root: string = LIBRARY_
 		},
 		rename(session: string, pseudonym: string) {
 			return call<Account>('PUT', '/api/account/pseudonym', { session, body: { pseudonym } });
+		},
+		/** Shows, or not, the items shared under earlier pseudonyms on the public profile. */
+		showEarlierPseudonyms(session: string, shown: boolean) {
+			return call<Account>('PUT', '/api/account/earlier-pseudonyms', {
+				session,
+				body: { shown }
+			});
 		},
 		/** Closes the library account; every session of its Minute Jar account ends. */
 		close(session: string) {

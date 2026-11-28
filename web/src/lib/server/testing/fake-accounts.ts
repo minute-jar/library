@@ -94,7 +94,8 @@ export function fakeAccounts(provider = 'https://id.example'): FakeAccounts {
 			const opened: Account = {
 				pseudonym,
 				minute_jar_account: fields.minute_jar_account as Account['minute_jar_account'],
-				opened_at: '2026-11-27T10:00:00Z'
+				opened_at: '2026-11-27T10:00:00Z',
+				show_earlier_pseudonyms: false
 			};
 			fake.accounts.set(subject, opened);
 			return json(opened, 201);
@@ -108,6 +109,13 @@ export function fakeAccounts(provider = 'https://id.example'): FakeAccounts {
 				if (owner === subject) fake.sessions.delete(other);
 			}
 			return new Response(null, { status: 204 });
+		}
+		if (url.pathname === '/api/account/earlier-pseudonyms' && request.method === 'PUT') {
+			if (!account) return refused(404, 'no_account');
+			if (typeof fields.shown !== 'boolean') return refused(400, 'bad_request');
+			const chosen = { ...account, show_earlier_pseudonyms: fields.shown };
+			fake.accounts.set(subject, chosen);
+			return json(chosen);
 		}
 		if (url.pathname === '/api/account/pseudonym' && request.method === 'PUT') {
 			if (!account) return refused(404, 'no_account');

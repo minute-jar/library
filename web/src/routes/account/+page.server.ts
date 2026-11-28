@@ -80,6 +80,18 @@ export const actions = {
 		}
 	},
 
+	earlier: async ({ request, fetch, cookies }) => {
+		const shown = (await request.formData()).get('show_earlier_pseudonyms') === 'on';
+		const session = cookies.get(SESSION_COOKIE);
+		if (!session) return signedOut();
+		try {
+			await accounts(fetch).showEarlierPseudonyms(session, shown);
+			return { earlier: shown };
+		} catch (failure) {
+			return refusal(failure, {});
+		}
+	},
+
 	close: async ({ request, fetch, cookies }) => {
 		const form = await request.formData();
 		const session = cookies.get(SESSION_COOKIE);

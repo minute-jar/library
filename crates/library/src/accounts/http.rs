@@ -24,6 +24,10 @@ pub fn router(library: Library) -> Router {
         .route("/api/session", get(current).delete(sign_out))
         .route("/api/account", get(account).post(open))
         .route("/api/account/pseudonym", put(rename))
+        .route(
+            "/api/account/earlier-pseudonyms",
+            put(show_earlier_pseudonyms),
+        )
         .with_state(library)
 }
 
@@ -213,5 +217,22 @@ async fn rename(State(library): State<Library>, headers: HeaderMap, request: Byt
     let (session, _) = signed_in(&library, &headers).await?;
     let rename: Rename = body(&request)?;
     let account = super::rename(&library.pool, &session, &rename.pseudonym).await?;
+    Ok(answer(StatusCode::OK, json!(account)))
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EarlierPseudonyms {
+    shown: bool,
+}
+
+async fn show_earlier_pseudonyms(
+    State(library): State<Library>,
+    headers: HeaderMap,
+    request: Bytes,
+) -> Answer {
+    let (session, _) = signed_in(&library, &headers).await?;
+    let asked: EarlierPseudonyms = body(&request)?;
+    let account = super::show_earlier_pseudonyms(&library.pool, &session, asked.shown).await?;
     Ok(answer(StatusCode::OK, json!(account)))
 }

@@ -56,6 +56,7 @@ async fn a_recent_strong_sign_in_opens_a_library_account_under_a_pseudonym() {
         "pseudonym": "Owl",
         "minute_jar_account": "same_as_subscription",
         "opened_at": "2026-11-27T10:00:00Z",
+        "show_earlier_pseudonyms": false,
     });
     assert_eq!(opened.status, StatusCode::CREATED);
     assert_eq!(opened.json(), account);

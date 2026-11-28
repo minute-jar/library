@@ -43,8 +43,11 @@ The service reads `acr`, `amr` and `auth_time` from the ID token. A sign-in is *
 An account, as its owner sees it:
 
 ```json
-{"pseudonym": "Owl", "minute_jar_account": "separate", "opened_at": "2026-11-27T10:00:00Z"}
+{"pseudonym": "Owl", "minute_jar_account": "separate", "opened_at": "2026-11-27T10:00:00Z",
+ "show_earlier_pseudonyms": false}
 ```
+
+`show_earlier_pseudonyms` is the owner's choice of what their public profile shows (`catalogue-api.md`, Author profiles): `false`, the default, keeps off it the items whose shared version carries an earlier pseudonym, and their pages lead to no profile; `true` shows them under the pseudonym of now.
 
 `minute_jar_account` is the choice made on the opening screen: `same_as_subscription` (one Minute Jar account for the library and hosted mode: the operator can join the pseudonym to the subscription, which lets the library account be linked to it) or `separate` (the person signs in to the library with another Minute Jar account, another e-mail address).
 
@@ -57,6 +60,7 @@ An account, as its owner sees it:
   - `403` `verified_email_required`: the provider gave no verified e-mail.
 - `GET /api/account` answers the account, or `404` `no_account`.
 - `PUT /api/account/pseudonym` with `{"pseudonym"}` changes it: `200` with the account; `bad_pseudonym`, `pseudonym_taken`, `no_account` as above.
+- `PUT /api/account/earlier-pseudonyms` with `{"shown": true | false}` sets `show_earlier_pseudonyms`: `200` with the account; `400` `bad_request` (not exactly that object), `no_account` as above.
 
 ### Closing
 
