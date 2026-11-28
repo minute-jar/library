@@ -54,6 +54,12 @@ export type ItemPage = Entry & {
 	editorial: Editorial | null;
 	/** The published comments, oldest first. */
 	comments?: Comment[];
+	/**
+	 * The pseudonym under which the author's profile is found now, which may
+	 * differ from the one this version was published under; null for an
+	 * item no library account shared.
+	 */
+	profile?: string | null;
 };
 
 /** How an item is rated now, with its published short reviews. */

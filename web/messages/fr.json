@@ -291,5 +291,11 @@
 	"items_withdrawn_now": "Retiré.",
 	"items_strong": "Pour retirer un élément, reconnectez-vous d'abord.",
 	"refused_withdrawal_confirmation": "Confirmez que vous comprenez que le retrait ne peut pas être annulé.",
-	"refused_already_withdrawn": "C'est déjà retiré."
+	"refused_already_withdrawn": "C'est déjà retiré.",
+	"author_title": "{pseudonym}, auteur",
+	"author_summary": "{items} éléments partagés, utilisés par {families} familles.",
+	"author_own": "Voici votre profil d'auteur tel que tout le monde le voit. Vous seul voyez aussi les suggestions reçues par vos éléments : personne d'autre ne les voit.",
+	"author_none": "Aucun de vos éléments n'apparaît encore dans le catalogue.",
+	"author_suggestions": "Suggestions de {families} familles, {answers} réponses en attente",
+	"author_link": "Votre profil d'auteur"
 }

@@ -1,11 +1,11 @@
-// The catalogue, accounts, sharing, author's items, suggestions, comments and moderation APIs' answers for the smoke tests, on
+// The catalogue, accounts, sharing, author's items, profiles, suggestions, comments and moderation APIs' answers for the smoke tests, on
 // 127.0.0.1:4174, a fake identity provider at `/authorize` that signs in
 // at once and sends the browser back to the website's callback page, and a
 // fake payment provider at `/setup/<check>` that verifies the card at once
 // and sends the browser back to the website's card page.
 
 import { createServer } from 'node:http';
-import { fakeApi } from '../src/lib/server/testing/fake-api.ts';
+import { fakeApi, verbs } from '../src/lib/server/testing/fake-api.ts';
 import { fakeAccounts } from '../src/lib/server/testing/fake-accounts.ts';
 import { fakeCards } from '../src/lib/server/testing/fake-cards.ts';
 import { fakeShares } from '../src/lib/server/testing/fake-shares.ts';
@@ -13,6 +13,7 @@ import { fakeComments } from '../src/lib/server/testing/fake-comments.ts';
 import { fakeModeration } from '../src/lib/server/testing/fake-moderation.ts';
 import { fakeSuggestions } from '../src/lib/server/testing/fake-suggestions.ts';
 import { fakeAuthored } from '../src/lib/server/testing/fake-authored.ts';
+import { fakeProfiles } from '../src/lib/server/testing/fake-profiles.ts';
 import type { AuthoredItem } from '../src/lib/server/authored.ts';
 
 const root = 'http://127.0.0.1:4174';
@@ -53,6 +54,15 @@ suggestions.anyone = [
 const authored = fakeAuthored(accounts);
 // Whoever opens an account has published one item.
 authored.everyone = [verbsOfTheAuthor];
+const profiles = fakeProfiles(accounts);
+// Whoever opens an account has one item on their profile, with suggestions.
+profiles.everyone = [
+	{
+		...verbs,
+		signals: { families: 3, ratings: [0, 0, 0, 0, 0] },
+		suggestions: { families: 2, answers: 3 }
+	}
+];
 // Whoever signs in moderates: the operator's naming is the service's concern.
 moderation.anyoneModerates = true;
 
@@ -86,6 +96,7 @@ createServer((request, response) => {
 			comments.fetch(asked) ??
 			shares.fetch(asked) ??
 			authored.fetch(asked) ??
+			profiles.fetch(asked) ??
 			cards.fetch(asked) ??
 			moderation.fetch(asked) ??
 			accounts.fetch(asked) ??

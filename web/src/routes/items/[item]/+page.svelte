@@ -73,7 +73,16 @@
 		<h1 class="text-2xl font-semibold">{item.title}</h1>
 		<p class="text-muted-foreground" lang={getLocale()}>
 			{item.type === 'bank' ? m.type_bank() : m.type_path()} ·
-			{m.by_author({ pseudonym: item.author.pseudonym })}
+			{#if item.profile}
+				<a
+					href={href(`/authors/${encodeURIComponent(item.profile)}`)}
+					class="underline underline-offset-4"
+				>
+					{m.by_author({ pseudonym: item.author.pseudonym })}
+				</a>
+			{:else}
+				{m.by_author({ pseudonym: item.author.pseudonym })}
+			{/if}
 		</p>
 		<p>{item.metadata.description}</p>
 		<div class="flex flex-wrap gap-2" lang={getLocale()}>
