@@ -64,6 +64,10 @@ _Avoid_: Family ID, client ID, device ID, installation ID
 A parent who has shared an item from their library account and answers for it.
 _Avoid_: Publisher, creator, contributor, uploader
 
+**Author Profile** (FR: Profil d'auteur):
+The page showing an author's shared items under their pseudonym of now and how many families use them, the same for everyone, to which the author alone sees the suggestions received added.
+_Avoid_: Library account, user page, portfolio
+
 **Sharing Terms** (FR: Conditions de partage):
 What a parent accepts at their first share: they hold the rights, the content is compliant, they answer for it, and it is licensed CC BY-SA 4.0.
 _Avoid_: Terms of service, EULA, publishing agreement

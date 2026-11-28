@@ -75,6 +75,7 @@ async fn the_item_page_shows_the_latest_version_with_its_content_and_every_versi
                 {"version": 1, "published_at": "2026-11-20T18:00:00Z"}
             ],
             "comments": [],
+            "profile": null,
         })
     );
 }

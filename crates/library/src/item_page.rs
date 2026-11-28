@@ -87,6 +87,7 @@ async fn shown(pool: &PgPool, item: &str) -> Result<Option<Value>, sqlx::Error> 
         })
         .collect();
     page["comments"] = crate::comments::shown(pool, item).await?;
+    page["profile"] = crate::profiles::of_item(pool, item).await?.into();
     Ok(Some(page))
 }
 
