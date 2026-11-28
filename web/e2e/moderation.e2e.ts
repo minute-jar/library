@@ -24,3 +24,19 @@ test('a moderator signs in with a passkey and decides a report with reasons', as
 	await expect(page.getByText('Upheld by Moderator')).toBeVisible();
 	await expect(page.getByText('The questions copy the workbook.')).toBeVisible();
 });
+
+test('a moderator adds an item to the Selection and removes it', async ({ page }) => {
+	await page.goto('/moderation/items/0123456789abcdef0123456789abcdef');
+	await page.getByRole('link', { name: 'Sign in with a passkey' }).click();
+	await page.goto('/moderation/items/0123456789abcdef0123456789abcdef');
+
+	await expect(page.getByText('This shared item is not in the Selection.')).toBeVisible();
+	await page.getByRole('button', { name: 'Add to the Selection' }).click();
+
+	await expect(page.getByText('Added to the Selection. The index is signed again.')).toBeVisible();
+	await expect(page.getByText(/In the Selection since .*, chosen by Moderator\./)).toBeVisible();
+	await page.getByRole('button', { name: 'Remove from the Selection' }).click();
+
+	await expect(page.getByText('Removed from the Selection.', { exact: false })).toBeVisible();
+	await expect(page.getByText('This shared item is not in the Selection.')).toBeVisible();
+});

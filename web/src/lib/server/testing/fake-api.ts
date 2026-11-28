@@ -62,6 +62,7 @@ export const verbsPage: ItemPage = {
 		lessons: [{ title: 'Strong verbs', text: 'Their vowel changes in the past.' }]
 	},
 	media: [],
+	editorial: null,
 	versions: [
 		{ version: 2, published_at: '2026-11-20T18:00:00Z' },
 		{ version: 1, published_at: '2026-11-18T09:00:00Z' }
@@ -79,7 +80,20 @@ export const moreVerbs: ItemPage = {
 	published_at: '2026-11-24T08:00:00Z',
 	content: { questions: [{ type: 'typed', prompt: "Past of 'run'", answers: ['ran'] }] },
 	media: [],
+	editorial: null,
 	versions: [{ version: 1, published_at: '2026-11-24T08:00:00Z' }]
+};
+
+/** The item page of the fractions, shared by the editorial account. */
+export const fractionsPage: ItemPage = {
+	...fractions,
+	content: { questions: [{ type: 'typed', prompt: 'Simplifier 2/4', answers: ['1/2'] }] },
+	media: [],
+	editorial: {
+		ai_generated: true,
+		read: { by: 'moderator', handle: 'Heron', at: '2026-11-20T09:00:00Z' }
+	},
+	versions: [{ version: 1, published_at: '2026-11-21T08:00:00Z' }]
 };
 
 export const verbsRatings: Ratings = {
@@ -116,8 +130,13 @@ export function fakeApi(): FakeApi {
 		asked: [],
 		page: { items: [verbs, fractions], total: 2, page: 1, pages: 1 },
 		filters: offered,
-		items: { [verbs.item]: verbsPage, [moreVerbs.item]: moreVerbs },
+		items: {
+			[verbs.item]: verbsPage,
+			[moreVerbs.item]: moreVerbs,
+			[fractions.item]: fractionsPage
+		},
 		ratings: {
+			[fractions.item]: { item: fractions.item, ratings: [0, 0, 0, 0, 0], reviews: [] },
 			[verbs.item]: verbsRatings,
 			[moreVerbs.item]: { item: moreVerbs.item, ratings: [0, 0, 0, 0, 0], reviews: [] }
 		},

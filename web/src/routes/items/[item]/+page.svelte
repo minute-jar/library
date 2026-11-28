@@ -90,8 +90,9 @@
 			{/if}
 			{#if item.selection}<Badge>{m.selection()}</Badge>{/if}
 			{#if item.author.editorial}<Badge variant="outline">{m.editorial()}</Badge>{/if}
-			{#if item.ai_generated}<Badge variant="outline">{m.item_ai_generated()}</Badge>{/if}
-			{#if item.read_by_person}<Badge variant="outline">{m.item_read_by_person()}</Badge>{/if}
+			{#if item.editorial?.ai_generated}
+				<Badge variant="outline">{m.item_ai_generated()}</Badge>
+			{/if}
 		</div>
 		<div class="grid gap-1 text-sm text-muted-foreground" lang={getLocale()}>
 			{#if data.original}
@@ -103,6 +104,16 @@
 							{m.item_original({ title: data.original.title, version: data.original.version })}
 						</a>
 					{/if}
+				</p>
+			{/if}
+			{#if item.editorial}
+				<p>
+					{item.editorial.read.by === 'moderator'
+						? m.item_read_by_moderator({
+								handle: item.editorial.read.handle,
+								date: date(item.editorial.read.at)
+							})
+						: m.item_read_by_operator({ date: date(item.editorial.read.at) })}
 				</p>
 			{/if}
 			{#if item.signals.families > 0}

@@ -36,15 +36,22 @@ export type Version = { version: number; published_at: string };
 /** A published comment from a library account, under its pseudonym. */
 export type Comment = { comment: string; pseudonym: string; text: string; published_at: string };
 
+/** Who read an editorial item before it was shared, and when. */
+export type Read =
+	| { by: 'moderator'; /** The moderator's handle. */ handle: string; at: string }
+	| { by: 'operator'; at: string };
+
+/** How the editorial account made a version, and who read it (ADR-0002). */
+export type Editorial = { ai_generated: boolean; read: Read };
+
 /** A shared item at its latest version, as its page shows it. */
 export type ItemPage = Entry & {
 	content: Content;
 	media: Medium[];
 	/** Every version the catalogue shows, newest first. */
 	versions: Version[];
-	/** Added by a later ticket; the page shows them only when present. */
-	ai_generated?: boolean;
-	read_by_person?: boolean;
+	/** Null unless the editorial account shared this version. */
+	editorial: Editorial | null;
 	/** The published comments, oldest first. */
 	comments?: Comment[];
 };

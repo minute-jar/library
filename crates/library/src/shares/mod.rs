@@ -70,6 +70,13 @@ pub(crate) enum ShareRefusal {
     BadOrigin,
     /// A new version names another original than the versions before it.
     OriginChanged,
+    /// Marks of the editorial account from another account.
+    NotEditorial,
+    /// A share from the editorial account that does not say how it was
+    /// made and who read it (ADR-0002).
+    ReadingRequired,
+    /// The reading names no moderator, or an instant to come.
+    BadReading,
     /// The account has shared [`SHARES_PER_DAY`] items today; it may share
     /// again from `next_share_at`.
     QuotaReached {
@@ -107,6 +114,10 @@ pub(crate) struct Prepared {
     /// The original this is derived from, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub derived_from: Option<NamedOrigin>,
+    /// How the editorial account made the item and who read it; from the
+    /// editorial account only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub editorial: Option<crate::editorial::Marks>,
     #[serde(rename = "type")]
     pub kind: Kind,
     pub title: String,
@@ -213,7 +224,8 @@ impl Prepared {
             title: self.title.trim().to_string(),
             author: Author {
                 pseudonym: pseudonym.to_string(),
-                editorial: false,
+                // Only the editorial account's shares carry its marks.
+                editorial: self.editorial.is_some(),
             },
             derived_from,
             metadata: Metadata {
@@ -378,6 +390,7 @@ pub(crate) async fn share(
     let item = lineage.item;
     version.item = item.clone();
     version.derived_from = lineage.derived_from;
+    let marks = crate::editorial::check(pool, sharer.id, prepared.editorial.as_ref(), now).await?;
     if accepts {
         accept_terms(pool, sharer.id, now).await?;
     }
@@ -409,6 +422,9 @@ pub(crate) async fn share(
         ReviewOutcome::Published => {
             author(pool, &item, sharer.id).await?;
             let published = library.publish_version(version, now).await?;
+            if let Some(marks) = &marks {
+                crate::editorial::record(pool, &item, published, marks).await?;
+            }
             sqlx::query(
                 "UPDATE shares SET item = $2, outcome = 'published', version = $3, decided_at = $4
                  WHERE id = $1",

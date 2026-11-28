@@ -81,6 +81,16 @@
 				</select>
 			</label>
 		{/each}
+		<label class="flex items-center gap-2 text-sm">
+			<input
+				type="checkbox"
+				name="selection"
+				value="true"
+				checked={data.query.selection === 'true'}
+				class="size-4"
+			/>
+			{m.filter_selection()}
+		</label>
 	</fieldset>
 	<div>
 		<Button variant="link" href="?" class="px-0">{m.filter_clear()}</Button>

@@ -41,6 +41,8 @@ export const SEARCH = [
 	'country',
 	'year',
 	'topic',
+	/** `true`: only the items marked Selection. */
+	'selection',
 	'page'
 ] as const;
 

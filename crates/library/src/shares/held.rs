@@ -240,5 +240,9 @@ async fn publish(
     .await
     .ok()?;
     let version = prepared.version(item, pseudonym, derived_from).ok()?;
-    library.publish_version(version, now).await.ok()
+    let published = library.publish_version(version, now).await.ok()?;
+    crate::editorial::record_held(&library.pool, item, published, prepared.editorial.as_ref())
+        .await
+        .ok()?;
+    Some(published)
 }
