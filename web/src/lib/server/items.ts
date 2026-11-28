@@ -33,8 +33,8 @@ export type Medium = { digest: string; type: string; size: number };
 
 export type Version = { version: number; published_at: string };
 
-/** A comment from a library account (a later ticket adds them). */
-export type Comment = { pseudonym: string; text: string; published_at: string };
+/** A published comment from a library account, under its pseudonym. */
+export type Comment = { comment: string; pseudonym: string; text: string; published_at: string };
 
 /** A shared item at its latest version, as its page shows it. */
 export type ItemPage = Entry & {
@@ -42,9 +42,10 @@ export type ItemPage = Entry & {
 	media: Medium[];
 	/** Every version the catalogue shows, newest first. */
 	versions: Version[];
-	/** Added by later tickets; the page shows them only when present. */
+	/** Added by a later ticket; the page shows them only when present. */
 	ai_generated?: boolean;
 	read_by_person?: boolean;
+	/** The published comments, oldest first. */
 	comments?: Comment[];
 };
 

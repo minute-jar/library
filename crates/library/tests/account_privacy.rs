@@ -87,6 +87,27 @@ fn every_route() -> Vec<(&'static str, String, Option<Value>)> {
             Some(common::shares::prepared("Irregular verbs, part 2")),
         ),
         ("GET", "/api/account/shares".into(), None),
+        (
+            "POST",
+            format!("/api/items/{VERBS}/comments"),
+            Some(json!({"text": "Learnt in a week."})),
+        ),
+        ("GET", "/api/account/comments".into(), None),
+        (
+            "POST",
+            "/api/comments/00000000000000000000000000000000/reports".into(),
+            Some(json!({"reason": "other"})),
+        ),
+        (
+            "POST",
+            "/api/moderation/comments/00000000000000000000000000000000/decision".into(),
+            Some(json!({"outcome": "published", "reason": "other", "reasons": "Fine."})),
+        ),
+        (
+            "POST",
+            "/api/moderation/comment-reports/00000000000000000000000000000000/decision".into(),
+            Some(json!({"outcome": "rejected", "reasons": "Fine."})),
+        ),
         ("GET", "/api/account/items".into(), None),
         (
             "POST",
@@ -147,7 +168,9 @@ fn assert_keeps_secrets(answer: &Answer, what: &str) {
 async fn no_route_answers_the_e_mail_or_the_minute_jar_account() {
     // With cards and sharing on, so that their routes answer as in deployment.
     let (library, provider, _, _, _) = common::cards::with_cards().await;
-    let library = library.with_sharing(common::shares::FakeReviewer::default());
+    let library = library
+        .with_sharing(common::shares::FakeReviewer::default())
+        .with_comments(common::shares::FakeReviewer::default(), signed_in_at);
     library
         .publish_version(
             library::NewVersion {

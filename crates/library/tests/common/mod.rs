@@ -261,5 +261,6 @@ pub fn pixel() -> Vec<u8> {
 pub const PIXEL: &str = "497790947d4666760ce38f3c00e852c71fdb66cae849bae8e9ede352719e1581";
 
 pub mod cards;
+pub mod comments;
 pub mod identity;
 pub mod shares;

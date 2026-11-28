@@ -79,6 +79,10 @@ A malformed `age`, `language` or `page` answers `400` with `{"error": "bad_filte
   "versions": [
     {"version": 2, "published_at": "2026-11-22T10:00:00Z"},
     {"version": 1, "published_at": "2026-11-20T18:00:00Z"}
+  ],
+  "comments": [
+    {"comment": "<32 hex>", "pseudonym": "Lark", "text": "Learnt in a week.",
+     "published_at": "2026-11-27T10:00:00Z"}
   ]
 }
 ```
@@ -87,8 +91,51 @@ A malformed `age`, `language` or `page` answers `400` with `{"error": "bad_filte
 - `content` and `media` are those of the signed shared item at that version (`interface-v1.md`, Shared items).
 - `versions` lists every version that is not withdrawn, newest first; each can be downloaded as an item file (`interface-v1.md`, Item files) at `GET /api/items/{item}/versions/{version}/file`.
 - Its ratings and published short reviews are at `GET /api/items/{item}/ratings` (`interface-v1.md`, Ratings, For the website).
-- Comments, and the AI-generated and read-by-a-person marks of editorial content, are added here by the tickets that bring them; until then they are absent, and the website shows them only when present.
+- `comments` lists the item's published comments, oldest first (see Comments below): never one held, refused, removed, or hidden by a report waiting for a moderator.
+- The AI-generated and read-by-a-person marks of editorial content are added here by the ticket that brings them; until then they are absent, and the website shows them only when present.
 - An item withdrawn, hidden, never published or malformed answers `404` with `{"error": "unknown_item"}`.
+
+## Comments
+
+A library account comments on an item page under its pseudonym (stories S28, S29). Every comment is reviewed (ADR-0005) before it shows. A comment is addressed to the item, never to an account: there are no private messages, no replies to an account, no mentions, and no route through which one account reaches another.
+
+```
+POST /api/items/{item}/comments
+Authorization: Bearer <session>
+Content-Type: application/json
+
+{"text": "Learnt in a week."}
+```
+
+- The session's library account needs a verified card (`accounts-api.md`), as for sharing; a recent strong sign-in is not needed. The body is exactly `{"text"}`: any other field (a recipient, a reply, an account) answers `400` `bad_request`, and `library_identifier` answers `400` `library_identifier_not_allowed`: a comment is never joined to a family server.
+- `text` is trimmed and holds 1 to 1000 characters, line breaks allowed but no other control characters.
+- The review reads the comment as `{"comment": "<text>"}` in the item's language, with the item's latest version and title. Its outcome is the answer, with `Cache-Control: private, no-store`:
+
+  ```json
+  {"comment": "<32 hex>", "item": "<32 hex>", "text": "Learnt in a week.", "outcome": "published",
+   "reasons": [], "commented_at": "2026-11-27T10:00:00Z"}
+  ```
+
+  `201` when `published`: it shows on the item page at once, under the account's pseudonym of that moment (a later pseudonym change does not rename it); `202` when `held` for a moderator (`moderation-api.md`, Queue), who publishes it under the pseudonym of the decision's moment, or refuses it; `200` when `refused`, with the reasons (`{"question": null, "reason", "explanation"}`).
+- A library account writes at most 20 comments a day (UTC), whatever the outcome; a review that fails does not count. Beyond, `429` `{"error": "comment_quota_reached", "comments_per_day": 20, "next_comment_at": "<next day>"}`.
+- Refusals: `401` `signed_out`, `404` `no_account`, `403` `card_required`, `404` `unknown_item` (the catalogue does not show it), `400` `bad_comment`, `503` `unavailable` (comments are not turned on, or the review fails).
+
+`GET /api/account/comments` answers the session's account's comments, newest first, with the day's quota: `{"quota": {"comments_per_day": 20, "commented_today": 1, "next_comment_at": null}, "comments": [<as above>]}`. `outcome` is `published`, `held`, `refused` or `removed` (a moderator upheld a report of it).
+
+### Reports of comments
+
+Anyone reports a published comment from the website, anonymously, with the reasons of the withdrawal list:
+
+```
+POST /api/comments/{comment}/reports
+Content-Type: application/json
+
+{"reason": "unsuitable_content", "details": "..."}
+```
+
+- The answer is `202 Accepted` with `{"report": "<32 hex>"}` and `Cache-Control: no-store`. The report keeps no library identifier and no contact.
+- For `personal_data`, `sexual_content` or `illegal_content`, the comment is hidden at once until a moderator decides. Every report waits in the moderation queue (`moderation-api.md`): upheld, the comment is removed; rejected, it shows again once no other report for these reasons waits.
+- Refusals: `400` `bad_reason`, `400` `bad_request` (not exactly the expected object, details over 2000 characters), `404` `unknown_comment` (no published comment has this identifier), `503` `unavailable`.
 
 ## HTTP
 

@@ -6,7 +6,9 @@ import type { FakeAccounts } from './fake-accounts.ts';
 import type {
 	AppealCase,
 	Case,
+	CommentReportCase,
 	Figures,
+	HeldCommentCase,
 	HeldReviewCase,
 	History,
 	ReportCase
@@ -58,6 +60,33 @@ export const heldShare: HeldReviewCase = {
 	content: { questions: [{ type: 'typed', prompt: 'Capital of Spain', answers: ['Madrid'] }] },
 	received_at: '2026-11-26T14:00:00Z',
 	due_at: '2026-11-28T14:00:00Z'
+};
+
+export const heldComment: HeldCommentCase = {
+	kind: 'held_comment',
+	comment: '11111111111111111111111111111111',
+	item: '0123456789abcdef0123456789abcdef',
+	title: 'Irregular verbs, part 1',
+	pseudonym: 'Lark',
+	text: 'Tom loved it.',
+	findings: 'It may name a child.',
+	received_at: '2026-11-26T15:00:00Z',
+	due_at: '2026-11-28T15:00:00Z'
+};
+
+export const reportedComment: CommentReportCase = {
+	kind: 'comment_report',
+	report: '22222222222222222222222222222222',
+	comment: '33333333333333333333333333333333',
+	item: '0123456789abcdef0123456789abcdef',
+	title: 'Irregular verbs, part 1',
+	pseudonym: 'Lark',
+	text: 'Learnt in a week.',
+	reason: 'unsuitable_content',
+	details: 'Rude.',
+	hidden: false,
+	received_at: '2026-11-26T16:00:00Z',
+	due_at: '2026-11-28T16:00:00Z'
 };
 
 export const verbsHistory: History = {
@@ -147,6 +176,23 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 			fake.cases.splice(index, 1);
 			return new Response(null, { status: 204 });
 		}
+		const onComment = path.match(
+			/^\/api\/moderation\/(comments|comment-reports)\/([^/]+)\/decision$/
+		);
+		if (onComment && request.method === 'POST') {
+			const { reasons } = (body ?? {}) as { reasons?: string };
+			if (!reasons?.trim()) return refused(400, 'reasons_required');
+			const [, kind, id] = onComment;
+			const index = fake.cases.findIndex((waiting) =>
+				kind === 'comments'
+					? waiting.kind === 'held_comment' && waiting.comment === id
+					: waiting.kind === 'comment_report' && waiting.report === id
+			);
+			if (index < 0)
+				return refused(404, kind === 'comments' ? 'unknown_comment' : 'unknown_report');
+			fake.cases.splice(index, 1);
+			return new Response(null, { status: 204 });
+		}
 		const decided = path.match(/^\/api\/moderation\/(reports|appeals)\/([^/]+)\/decision$/);
 		if (decided && request.method === 'POST') {
 			const { outcome, reasons } = (body ?? {}) as { outcome?: string; reasons?: string };
@@ -159,7 +205,7 @@ export function fakeModeration(accounts: FakeAccounts): FakeModeration {
 			);
 			if (index < 0) return refused(404, kind === 'reports' ? 'unknown_report' : 'unknown_appeal');
 			const [done] = fake.cases.splice(index, 1);
-			if (done.kind === 'held_review') return refused(404, 'unknown_report');
+			if (done.kind !== 'report' && done.kind !== 'appeal') return refused(404, 'unknown_report');
 			if (done.kind === 'appeal' && done.decision.moderator === handle) {
 				fake.cases.splice(index, 0, done);
 				return refused(403, 'same_moderator');

@@ -1,4 +1,4 @@
-// The catalogue, accounts, sharing, author's items and moderation APIs' answers for the smoke tests, on
+// The catalogue, accounts, sharing, author's items, suggestions, comments and moderation APIs' answers for the smoke tests, on
 // 127.0.0.1:4174, a fake identity provider at `/authorize` that signs in
 // at once and sends the browser back to the website's callback page, and a
 // fake payment provider at `/setup/<check>` that verifies the card at once
@@ -9,6 +9,7 @@ import { fakeApi } from '../src/lib/server/testing/fake-api.ts';
 import { fakeAccounts } from '../src/lib/server/testing/fake-accounts.ts';
 import { fakeCards } from '../src/lib/server/testing/fake-cards.ts';
 import { fakeShares } from '../src/lib/server/testing/fake-shares.ts';
+import { fakeComments } from '../src/lib/server/testing/fake-comments.ts';
 import { fakeModeration } from '../src/lib/server/testing/fake-moderation.ts';
 import { fakeSuggestions } from '../src/lib/server/testing/fake-suggestions.ts';
 import { fakeAuthored } from '../src/lib/server/testing/fake-authored.ts';
@@ -28,6 +29,7 @@ const api = fakeApi();
 const accounts = fakeAccounts(root);
 const cards = fakeCards(accounts, root);
 const shares = fakeShares(accounts);
+const comments = fakeComments(accounts, api);
 const moderation = fakeModeration(accounts);
 const suggestions = fakeSuggestions(accounts);
 // Whoever signs in received suggestions for one item of theirs.
@@ -81,6 +83,7 @@ createServer((request, response) => {
 		});
 		void (
 			suggestions.fetch(asked) ??
+			comments.fetch(asked) ??
 			shares.fetch(asked) ??
 			authored.fetch(asked) ??
 			cards.fetch(asked) ??

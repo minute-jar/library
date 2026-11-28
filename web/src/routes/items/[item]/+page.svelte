@@ -6,10 +6,31 @@
 	import { Badge } from '#lib/components/ui/badge/index.js';
 	import { Button } from '#lib/components/ui/button/index.js';
 	import type { Source } from '#lib/server/items.ts';
+	import { REPORT_REASONS } from '#lib/report-reasons.ts';
+	import { reasonWord } from '#lib/moderation-words.ts';
 	import type { PageProps } from './$types';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 	const item = $derived(data.item);
+
+	const refusals: Record<string, () => string> = {
+		signed_out: m.refused_signed_out,
+		no_account: m.refused_no_account,
+		card_required: m.refused_card_required,
+		bad_comment: m.refused_bad_comment,
+		comment_quota_reached: m.refused_comment_quota_reached,
+		reason_required: m.refused_reason_required,
+		unknown_comment: m.refused_unknown_comment
+	};
+	const code = $derived(form && 'refused' in form ? form.refused : null);
+	const refused = $derived(code ? (refusals[code] ?? m.refused_other)() : null);
+	/** The comment a report form was sent for, if any. */
+	const reportedOn = $derived(
+		form && 'reported' in form ? form.reported : form && 'comment' in form ? form.comment : null
+	);
+	const commented = $derived(form && 'commented' in form ? form.commented : null);
+	const written = $derived(form && 'text' in form ? form.text : '');
+	const href = (path: string) => resolve(localizeHref(path) as Path);
 
 	const languageNames = $derived(new Intl.DisplayNames([getLocale()], { type: 'language' }));
 	const language = (tag: string) => languageNames.of(tag) ?? tag;
@@ -182,21 +203,108 @@
 		{/if}
 	</section>
 
-	{#if item.comments?.length}
-		<section class="grid gap-2">
-			<h2 class="text-xl font-semibold">{m.item_comments()}</h2>
+	<section class="grid gap-3" aria-labelledby="comments">
+		<h2 id="comments" class="text-xl font-semibold">{m.item_comments()}</h2>
+		{#if item.comments?.length}
 			<ul class="grid gap-2">
-				{#each item.comments as comment, i (i)}
-					<li class="rounded-lg border p-3">
+				{#each item.comments as comment (comment.comment)}
+					<li class="grid gap-1 rounded-lg border p-3">
 						<p class="text-sm text-muted-foreground">
 							{comment.pseudonym} · {date(comment.published_at)}
 						</p>
-						<p>{comment.text}</p>
+						<p class="whitespace-pre-line" lang={item.metadata.language}>{comment.text}</p>
+						{#if reportedOn === comment.comment && form && 'reported' in form}
+							<p role="status" class="text-sm">{m.reported_comment()}</p>
+						{:else}
+							<details class="text-sm">
+								<summary class="cursor-pointer text-muted-foreground">{m.report_comment()}</summary>
+								<form method="post" action="?/report" class="mt-2 grid gap-2">
+									<input type="hidden" name="comment" value={comment.comment} />
+									<label class="grid gap-1">
+										{m.report_reason()}
+										<select
+											name="reason"
+											required
+											class="rounded-md border bg-transparent px-3 py-2"
+										>
+											<option value=""></option>
+											{#each REPORT_REASONS as reason (reason)}
+												<option value={reason}>{reasonWord(reason)}</option>
+											{/each}
+										</select>
+									</label>
+									<label class="grid gap-1">
+										{m.report_details()}
+										<textarea
+											name="details"
+											rows="2"
+											maxlength="2000"
+											class="rounded-md border bg-transparent px-3 py-2"></textarea>
+									</label>
+									<div>
+										<Button type="submit" variant="outline" size="sm">{m.report_submit()}</Button>
+									</div>
+								</form>
+								{#if reportedOn === comment.comment && refused}
+									<p role="alert" class="text-destructive">{refused}</p>
+								{/if}
+							</details>
+						{/if}
 					</li>
 				{/each}
 			</ul>
-		</section>
-	{/if}
+		{:else}
+			<p class="text-muted-foreground">{m.comment_none()}</p>
+		{/if}
+
+		{#if commented === 'published'}
+			<p role="status">{m.comment_published()}</p>
+		{:else if commented === 'held'}
+			<p role="status">{m.comment_held()}</p>
+		{:else if commented === 'refused' && form && 'reasons' in form}
+			<div role="alert">
+				<p>{m.comment_refused()}</p>
+				<ul class="mt-1 grid list-disc gap-1 pl-5">
+					{#each form.reasons as reason, n (n)}
+						<li>{reasonWord(reason.reason)}: {reason.explanation}</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+		{#if refused && !reportedOn}
+			<p role="alert" class="text-destructive">
+				{refused}
+				{#if code === 'no_account' || code === 'signed_out'}
+					<a href={href('/account')} class="underline">{m.account_link()}</a>
+				{:else if code === 'card_required'}
+					<a href={href('/account/card')} class="underline">{m.card_link()}</a>
+				{/if}
+			</p>
+		{/if}
+
+		{#if data.signedIn}
+			<form method="post" action="?/comment" class="grid gap-2">
+				<label class="grid gap-1">
+					{m.comment_label()}
+					<textarea
+						name="text"
+						required
+						rows="3"
+						maxlength="1000"
+						class="rounded-md border bg-transparent px-3 py-2"
+						value={commented === 'published' || commented === 'held' ? '' : written}></textarea>
+				</label>
+				<p class="text-sm text-muted-foreground">{m.comment_help()}</p>
+				<div>
+					<Button type="submit">{m.comment_submit()}</Button>
+				</div>
+			</form>
+		{:else}
+			<p class="text-sm">
+				<a href={href('/account')} class="underline">{m.comment_sign_in()}</a>
+			</p>
+		{/if}
+	</section>
 
 	<section class="grid gap-2">
 		<h2 class="text-xl font-semibold">{m.item_versions()}</h2>

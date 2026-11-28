@@ -13,6 +13,7 @@ mod bank_format;
 mod browse;
 mod cards;
 mod catalogue;
+mod comments;
 mod http;
 mod imports;
 mod item_page;
@@ -44,6 +45,10 @@ pub use crate::cards::{
     VerifiedBy, VerifiedCard,
 };
 pub use crate::catalogue::PublishError;
+pub use crate::comments::moderation::{
+    CommentDecisionError, CommentReport, CommentReportError, HeldComment, QueuedCommentReport,
+};
+pub use crate::comments::{COMMENT_LENGTH, COMMENTS_PER_DAY};
 pub use crate::imports::ImportError;
 pub use crate::media::{ITEM_MEDIA_LIMIT, LocalDirectory, MEDIUM_LIMIT, MediaStore, StoreFuture};
 pub use crate::moderation::{
@@ -145,6 +150,7 @@ pub struct Library {
     cards: Option<Arc<cards::Desk>>,
     reports: Option<Arc<reports::Desk>>,
     sharing: Option<Arc<shares::Desk>>,
+    comments: Option<Arc<comments::Desk>>,
 }
 
 impl Library {
@@ -169,6 +175,7 @@ impl Library {
             cards: None,
             reports: None,
             sharing: None,
+            comments: None,
         })
     }
 
@@ -239,6 +246,62 @@ impl Library {
             reviewer: Box::new(reviewer),
         }));
         self
+    }
+
+    /// Turns on comments from library accounts: every comment is reviewed
+    /// by `reviewer` (ADR-0005) before it shows; the anonymous routes
+    /// (reports of comments) read the instant from `clock`. Needs
+    /// [`Library::with_accounts`] and [`Library::with_cards`] (a comment
+    /// needs a verified card); without it, the comments' routes are refused
+    /// as unavailable.
+    pub fn with_comments(
+        mut self,
+        reviewer: impl Reviewer,
+        clock: impl Fn() -> Timestamp + Send + Sync + 'static,
+    ) -> Self {
+        self.comments = Some(Arc::new(comments::Desk {
+            reviewer: Box::new(reviewer),
+            clock: Box::new(clock),
+        }));
+        self
+    }
+
+    /// Receives at `now` a report of the published comment `comment`;
+    /// answers the report's identifier.
+    pub async fn report_comment(
+        &self,
+        comment: &str,
+        report: CommentReport,
+        now: Timestamp,
+    ) -> Result<String, CommentReportError> {
+        comments::moderation::receive(&self.pool, comment, report, now).await
+    }
+
+    /// Records at `now` the decision of the moderator `moderator` on a
+    /// comment the review held: publishes it under its author's pseudonym,
+    /// or refuses it with the reasons its author reads. The decisions log
+    /// keeps it.
+    pub async fn decide_comment(
+        &self,
+        moderator: &str,
+        comment: &str,
+        decision: HeldDecision,
+        now: Timestamp,
+    ) -> Result<(), CommentDecisionError> {
+        comments::moderation::decide_held(&self.pool, moderator, comment, decision, now).await
+    }
+
+    /// Records at `now` the decision of the moderator `moderator` on a
+    /// report of a comment: upheld removes the comment, rejected shows it
+    /// again. The decisions log keeps it.
+    pub async fn decide_comment_report(
+        &self,
+        moderator: &str,
+        report: &str,
+        decision: Decision,
+        now: Timestamp,
+    ) -> Result<(), DecideError> {
+        comments::moderation::decide_report(&self.pool, moderator, report, decision, now).await
     }
 
     /// Publishes the next version of a shared item; answers its version number.
@@ -527,6 +590,7 @@ impl Library {
             .merge(cards::http::router(self.clone()))
             .merge(shares::http::router(self.clone()))
             .merge(suggestions::http::router(self.clone()))
+            .merge(comments::http::router(self.clone()))
             .merge(authors_withdrawal::router(self.clone()))
             .layer(axum::middleware::from_fn(
                 accounts::http::refuse_sessions_on_family_routes,

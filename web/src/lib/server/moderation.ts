@@ -72,8 +72,39 @@ export type HeldReviewCase = {
 
 export type HeldOutcome = 'published' | 'refused';
 
+/** A comment the review held for a moderator, who publishes or refuses it. */
+export type HeldCommentCase = {
+	kind: 'held_comment';
+	comment: string;
+	item: string;
+	title: string | null;
+	/** The author's pseudonym, under which it would be published. */
+	pseudonym: string;
+	text: string;
+	findings: string;
+	received_at: string;
+	due_at: string;
+};
+
+/** A report of a published comment; upheld, the comment is removed. */
+export type CommentReportCase = {
+	kind: 'comment_report';
+	report: string;
+	comment: string;
+	item: string;
+	title: string | null;
+	pseudonym: string;
+	text: string;
+	reason: Reason;
+	details: string | null;
+	/** Whether the comment is hidden until the decision. */
+	hidden: boolean;
+	received_at: string;
+	due_at: string;
+};
+
 /** What waits in the one queue. */
-export type Case = ReportCase | AppealCase | HeldReviewCase;
+export type Case = ReportCase | AppealCase | HeldReviewCase | HeldCommentCase | CommentReportCase;
 
 export type HistoryEntry =
 	| {
@@ -194,6 +225,30 @@ export function moderation(fetch: typeof globalThis.fetch, root: string = LIBRAR
 				`/api/moderation/shares/${encodeURIComponent(share)}/decision`,
 				session,
 				{ outcome, reason, reasons }
+			);
+		},
+		/** Publishes or refuses a held comment, naming the rule its findings were about. */
+		decideComment(
+			session: string,
+			comment: string,
+			outcome: HeldOutcome,
+			reason: Reason,
+			reasons: string
+		) {
+			return call<void>(
+				'POST',
+				`/api/moderation/comments/${encodeURIComponent(comment)}/decision`,
+				session,
+				{ outcome, reason, reasons }
+			);
+		},
+		/** Upholds the report of a comment, which removes it, or rejects it. */
+		decideCommentReport(session: string, report: string, outcome: Outcome, reasons: string) {
+			return call<void>(
+				'POST',
+				`/api/moderation/comment-reports/${encodeURIComponent(report)}/decision`,
+				session,
+				{ outcome, reasons }
 			);
 		},
 		figures(session: string, year: number) {

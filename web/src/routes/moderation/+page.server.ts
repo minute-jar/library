@@ -1,4 +1,5 @@
-// The moderation queue: the reports and appeals waiting for a moderator,
+// The moderation queue: the reports, appeals, held shares and comments
+// waiting for a moderator,
 // oldest first, each decided here with reasons sent to the author and the
 // reporter. Only a moderator signed in with a recent passkey gets in.
 
@@ -48,7 +49,7 @@ const REASONS: Reason[] = [
 async function deciding(
 	request: Request,
 	cookies: { get(name: string): string | undefined },
-	field: 'report' | 'appeal' | 'share',
+	field: 'report' | 'appeal' | 'share' | 'comment' | 'comment_report',
 	outcomes: string[],
 	decide: (
 		session: string,
@@ -66,7 +67,10 @@ async function deciding(
 	const session = cookies.get(SESSION_COOKIE);
 	if (!session) return fail(401, { refused: 'signed_out', ...values });
 	if (!outcomes.includes(outcome)) return fail(400, { refused: 'outcome_required', ...values });
-	if (field === 'share' && !REASONS.includes(text(form, 'reason') as Reason)) {
+	if (
+		(field === 'share' || field === 'comment') &&
+		!REASONS.includes(text(form, 'reason') as Reason)
+	) {
 		return fail(400, { refused: 'reason_required', ...values });
 	}
 	try {
@@ -108,5 +112,29 @@ export const actions = {
 					text(form, 'reason') as Reason,
 					reasons
 				)
+		),
+	decideComment: ({ request, fetch, cookies }) =>
+		deciding(
+			request,
+			cookies,
+			'comment',
+			['published', 'refused'],
+			(session, id, outcome, reasons, form) =>
+				moderation(fetch).decideComment(
+					session,
+					id,
+					outcome as HeldOutcome,
+					text(form, 'reason') as Reason,
+					reasons
+				)
+		),
+	decideCommentReport: ({ request, fetch, cookies }) =>
+		deciding(
+			request,
+			cookies,
+			'comment_report',
+			['upheld', 'rejected'],
+			(session, id, outcome, reasons) =>
+				moderation(fetch).decideCommentReport(session, id, outcome as Outcome, reasons)
 		)
 } satisfies Actions;

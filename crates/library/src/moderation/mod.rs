@@ -19,6 +19,7 @@ pub(crate) use appeals::{decide as decide_appeal, receive as appeal, state as ap
 use jiff::{SignedDuration, Timestamp};
 use sqlx::{PgPool, Postgres, Transaction};
 
+use crate::comments::moderation::{HeldComment, QueuedCommentReport};
 use crate::contract::SigningKey;
 use crate::reports::{self, DecideError, Decision, Effect, FormalNotice, Outcome, QueuedReport};
 use crate::shares::held::HeldShare;
@@ -106,6 +107,10 @@ pub enum Case {
     Appeal(QueuedAppeal),
     /// A share the review held, with its findings.
     HeldReview(HeldShare),
+    /// A comment the review held, with its findings.
+    HeldComment(HeldComment),
+    /// A report of a published comment.
+    CommentReport(QueuedCommentReport),
 }
 
 impl Case {
@@ -115,6 +120,8 @@ impl Case {
             Case::Report(report) => report.received_at,
             Case::Appeal(appeal) => appeal.received_at,
             Case::HeldReview(share) => share.received_at,
+            Case::HeldComment(comment) => comment.received_at,
+            Case::CommentReport(report) => report.received_at,
         }
     }
 
@@ -138,6 +145,18 @@ pub(crate) async fn cases(pool: &PgPool) -> Result<Vec<Case>, sqlx::Error> {
                 .await?
                 .into_iter()
                 .map(Case::HeldReview),
+        )
+        .chain(
+            crate::comments::moderation::held(pool)
+                .await?
+                .into_iter()
+                .map(Case::HeldComment),
+        )
+        .chain(
+            crate::comments::moderation::reported(pool)
+                .await?
+                .into_iter()
+                .map(Case::CommentReport),
         )
         .collect();
     cases.sort_by_key(Case::received_at);

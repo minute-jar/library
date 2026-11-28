@@ -42,6 +42,10 @@ _Avoid_: Comment (from a library account), testimonial, feedback
 An answer to accept for a question of a shared item, sent under a library identifier that imported it; its author sees how many families suggested it, never which, and may accept it into a new version.
 _Avoid_: Correction, proposal, pull request, feedback
 
+**Comment** (FR: Commentaire):
+What a library account writes on a shared item's page under its pseudonym, shown once the review publishes it; addressed to the item, never to another account.
+_Avoid_: Message, reply, post, short review
+
 ### People
 
 **Minute Jar Account** (FR: Compte Minute Jar):

@@ -4,7 +4,9 @@ import { fakeAccounts, fakeCookies } from '#lib/server/testing/fake-accounts.ts'
 import {
 	authorAppeal,
 	fakeModeration,
+	heldComment,
 	heldShare,
+	reportedComment,
 	rightsReport
 } from '#lib/server/testing/fake-moderation.ts';
 import { actions, load } from './+page.server.ts';
@@ -207,6 +209,60 @@ describe('the moderation queue', () => {
 				reasons: 'Question 2 names a real school.'
 			}
 		});
+	});
+
+	it('publishes or refuses a held comment, naming the rule its findings were about', async () => {
+		const fakes = api();
+		fakes.moderation.cases.push(structuredClone(heldComment));
+		const session = fakes.accounts.signedIn('subject-1');
+		const form = {
+			comment: heldComment.comment,
+			outcome: 'published',
+			reason: 'personal_data',
+			reasons: 'Tom is no one in particular.'
+		};
+
+		const withoutReason = await actions.decideComment(
+			event(fakes, session, { ...form, reason: '' }) as unknown as ActionEvent
+		);
+		const answer = await actions.decideComment(
+			event(fakes, session, form) as unknown as ActionEvent
+		);
+
+		expect(withoutReason).toMatchObject({ status: 400, data: { refused: 'reason_required' } });
+		expect(answer).toEqual({ decided: heldComment.comment });
+		expect(fakes.moderation.asked.at(-1)).toEqual({
+			method: 'POST',
+			path: `/api/moderation/comments/${heldComment.comment}/decision`,
+			body: {
+				outcome: 'published',
+				reason: 'personal_data',
+				reasons: 'Tom is no one in particular.'
+			}
+		});
+		expect(fakes.moderation.cases).not.toContainEqual(heldComment);
+	});
+
+	it('upholds or rejects the report of a comment', async () => {
+		const fakes = api();
+		fakes.moderation.cases.push(structuredClone(reportedComment));
+		const session = fakes.accounts.signedIn('subject-1');
+
+		const answer = await actions.decideCommentReport(
+			event(fakes, session, {
+				comment_report: reportedComment.report,
+				outcome: 'upheld',
+				reasons: 'Rude.'
+			}) as unknown as ActionEvent
+		);
+
+		expect(answer).toEqual({ decided: reportedComment.report });
+		expect(fakes.moderation.asked.at(-1)).toEqual({
+			method: 'POST',
+			path: `/api/moderation/comment-reports/${reportedComment.report}/decision`,
+			body: { outcome: 'upheld', reasons: 'Rude.' }
+		});
+		expect(fakes.moderation.cases).not.toContainEqual(reportedComment);
 	});
 
 	it('refuses to decide when signed out', async () => {

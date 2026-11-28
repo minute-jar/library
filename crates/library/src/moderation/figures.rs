@@ -39,7 +39,10 @@ pub(crate) async fn of_year(pool: &PgPool, year: i16) -> Result<Option<Figures>,
         return Ok(None);
     };
     let reports: Vec<(String, i64)> = sqlx::query_as(
-        "SELECT reason, count(*) FROM reports
+        "SELECT reason, count(*) FROM (
+             SELECT reason, received_at FROM reports
+             UNION ALL SELECT reason, received_at FROM comment_reports
+         ) AS received
          WHERE received_at >= $1 AND received_at < $2 GROUP BY reason ORDER BY reason",
     )
     .bind(from)
